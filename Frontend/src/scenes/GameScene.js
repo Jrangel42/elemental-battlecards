@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { calculateRowPositions } from '../helpers/zone';
-import { createInitialDeck } from '../game_objects/deck';
+import Player from '../game_objects/player.js';
 
 /**
  * La escena principal donde se desarrolla el juego de cartas.
@@ -59,14 +59,12 @@ export default class GameScene extends Phaser.Scene {
         // Le pasamos los datos del jugador también a la UI.
         this.scene.launch('UIScene', { playerData: this.playerData });
 
-        // ---------- LÓGICA DE DATOS (MAZOS Y MANOS) ----------
-        // Creamos los mazos para cada jugador usando nuestro helper.
-        this.playerDeck = createInitialDeck();
-        this.opponentDeck = createInitialDeck();
-
-        // Sacamos las primeras 4 cartas de cada mazo para formar las manos iniciales.
-        this.playerHand = this.playerDeck.splice(0, 4);
-        this.opponentHand = this.opponentDeck.splice(0, 4);
+        // ---------- LÓGICA DE JUGADORES ----------
+        // Creamos las instancias de los jugadores. La clase Player se encargará de su propio mazo y mano.
+        this.player = new Player('player', this);
+        this.opponent = new Player('opponent', this);
+        this.player.drawInitialHand();
+        this.opponent.drawInitialHand();
 
         // Fondo centrado
         this.board = this.add.image(width / 2, height / 2, 'board-bg')
@@ -75,7 +73,7 @@ export default class GameScene extends Phaser.Scene {
 
         // ---------- ZONA DE MANO DEL OPONENTE (4 espacios) ----------
         this.createSlotsRow(height * 0.2, 'opponent-slots');
-        this.createCardsRow(height * 0.2, 'opponent-cards', this.opponentHand, false); // false = no revelar (boca abajo)
+        this.createCardsRow(height * 0.2, 'opponent-cards', this.opponent.hand);
 
         // ---------- CENTRO (campo de batalla con 6 espacios) ----------
         this.createSlotsRow(height / 2 - battleRowYOffset, 'opponent_battle_slots', 6); // Fila del oponente
@@ -83,7 +81,7 @@ export default class GameScene extends Phaser.Scene {
 
         // ---------- ZONA DE MANO DEL JUGADOR (4 espacios) ----------
         this.createSlotsRow(height * 0.8, 'player-slots');
-        this.createCardsRow(height * 0.8, 'player-cards', this.playerHand, true); // true = revelar (boca arriba)
+        this.createCardsRow(height * 0.8, 'player-cards', this.player.hand);
 
         // ---------- MAZOS ----------
         this.createDecks();
@@ -123,33 +121,52 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // Crear fila de cartas
-    createCardsRow(y, name, hand, revealed) {
-       const cards = [];
+    createCardsRow(y, name, hand) {
+        const cards = [];
         const numCards = hand.length;
         const cardWidth = 110; // Ancho reducido
         const cardSpacing = 10; // Espacio reducido
         const positionsX = calculateRowPositions({
             numItems: numCards,
             itemWidth: cardWidth,
-            itemSpacing: cardSpacing,
+            itemSpacing: cardSpacing, 
             containerWidth: this.scale.width
         });
- 
+
         for (let i = 0; i < numCards; i++) {
             const cardData = hand[i];
-            // La textura será el reverso o el anverso según el parámetro 'revealed'
-            const texture = revealed ? `card-${cardData.type}-1` : 'card-back-opponent';
 
-            let card = this.add.image(positionsX[i], y, texture)
-                .setScale(0.15) // Escala reducida
-                .setInteractive({ cursor: 'pointer' });
-            
-            card.setData('cardData', cardData); // Guardamos los datos de la carta en el objeto de Phaser
+            let card;
+            if (name === 'player-cards') {
+                card = this.createPlayerCard(positionsX[i], y, cardData);
+            } else {
+                card = this.createOpponentCard(positionsX[i], y, cardData);
+            }
 
-            cards.push(card);   
+            cards.push(card);
         }
 
         this[name] = cards;
+    }
+
+    // Crear carta del jugador
+    createPlayerCard(x, y, cardData) {
+        const texture = `card-${cardData.type}-1`; // Anverso
+        let card = this.add.image(x, y, texture)
+            .setScale(0.8) // Escala reducida
+            .setInteractive({ cursor: 'pointer' });
+        card.setData('cardData', cardData); // Guardamos los datos de la carta
+        return card;
+    }
+
+    // Crear carta del oponente
+    createOpponentCard(x, y, cardData) {
+        const texture = 'card-back-opponent'; // Reverso
+        let card = this.add.image(x, y, texture)
+            .setScale(0.14) // Escala reducida
+            .setInteractive({ cursor: 'pointer' });
+        card.setData('cardData', cardData); // Guardamos los datos de la carta
+        return card;
     }
 
     // Crear mazo y cementerio
@@ -157,11 +174,11 @@ export default class GameScene extends Phaser.Scene {
         const { width, height } = this.scale;
 
         // Mazo del jugador
-        this.add.image(width - 270, height - 140, 'card-back-player').setScale(0.15); // Visual del mazo
-        this.playerDeckText = this.add.text(width - 270, height - 140, this.playerDeck.length, { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+        this.add.image(width - 270, height - 140, 'card-back-player').setScale(0.14);
+        this.playerDeckText = this.add.text(width - 270, height - 140, this.player.deck.getCardsCount(), { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
 
         // Mazo del oponente
-        this.add.image(270, 140, 'card-back-opponent').setScale(0.15); // Visual del mazo
-        this.opponentDeckText = this.add.text(270, 140, this.opponentDeck.length, { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+        this.add.image(270, 140, 'card-back-opponent').setScale(0.14);
+        this.opponentDeckText = this.add.text(270, 140, this.opponent.deck.getCardsCount(), { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
     }
 }
