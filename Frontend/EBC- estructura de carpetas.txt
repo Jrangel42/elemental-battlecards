@@ -1,0 +1,32 @@
+/elementals-battle-cards/
+|
+|-- /assets/
+|   |-- /images/
+|   |   |-- cards/         // Imágenes para cada carta (fuego_1, agua_1, etc.)
+|   |   |-- ui/            // Botones, fondos, marcos, etc.
+|   |   `-- background.png // Imagen de fondo del tablero
+|   `-- /audio/
+|       |-- music/
+|       `-- sfx/           // Sonidos de ataque, fusión, etc.
+|
+|-- /src/
+|   |-- /scenes/
+|   |   |-- BootScene.js   // Carga los assets iniciales
+|   |   |-- MainMenu.js    // Escena del menú principal
+|   |   |-- GameScene.js   // La escena principal del juego
+|   |   `-- UIScene.js     // Interfaz de usuario (puntos, turnos, etc.)
+|   |
+|   |-- /game_objects/
+|   |   |-- Card.js        // La clase para las cartas
+|   |   |-- Deck.js        // Lógica del mazo (robar, barajar)
+|   |   `-- Player.js      // Lógica del jugador (mano, campo, esencias)
+|   |
+|   |-- /helpers/
+|   |   |-- Constants.js   // Constantes del juego (tipos, ventajas)
+|   |   `-- Zone.js        // Una clase para crear zonas interactivas (campo, mano)
+|   |
+|   `-- main.js            // El punto de entrada del juego
+|
+|-- index.html             // El archivo HTML que carga el juego
+|-- package.json           // Gestiona las dependencias del proyecto
+`-- node_modules/          // Carpeta donde se instala Phaser

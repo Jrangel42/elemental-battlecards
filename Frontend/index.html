@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Elemental Battlecards</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        /* Asegura que el contenedor del juego y el formulario HTML se superpongan correctamente */
+        /* Hacemos que el contenedor del juego ocupe toda la pantalla */
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container"></div>
+    <script type="module" src="/src/main.js"></script>
+
+</body>
+</html>
