@@ -225,7 +225,7 @@ export default class GameScene extends Phaser.Scene {
     createPlayerCard(x, y, cardData) {
         const texture = `card-${cardData.type}-1`; // Anverso
         let card = this.add.image(x, y, texture)
-            .setScale(0.8) // Escala reducida
+            .setScale(0.95) // Escala reducida
             .setInteractive({ cursor: 'pointer', draggable: true }); // Hacemos la carta arrastrable
         card.setData('cardData', cardData); // Guardamos los datos de la carta
 
@@ -299,11 +299,11 @@ export default class GameScene extends Phaser.Scene {
         const { width, height } = this.scale;
 
         // Mazo del jugador
-        this.add.image(width - 270, height - 140, 'card-back-player').setScale(0.14);
+        this.add.image(width - 300, height - 250, 'card-back-player').setScale(0.25);
         this.playerDeckText = this.add.text(width - 270, height - 140, this.player.deck.getCardsCount(), { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
 
         // Mazo del oponente
-        this.add.image(270, 140, 'card-back-opponent').setScale(0.14);
+        this.add.image(300, 240, 'card-back-opponent').setScale(0.25);
         this.opponentDeckText = this.add.text(270, 140, this.opponent.deck.getCardsCount(), { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
     }
 
