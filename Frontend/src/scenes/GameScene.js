@@ -8,7 +8,6 @@ import Player from '../game_objects/player.js';
  */
 export default class GameScene extends Phaser.Scene {
     constructor() {
-
         super('GameScene');
         this.playerData = null; // Propiedad para guardar los datos del jugador
     }
@@ -67,16 +66,16 @@ export default class GameScene extends Phaser.Scene {
         this.board.setDepth(-1);
 
         // ---------- ZONA DE MANO DEL OPONENTE (4 espacios) ----------
-        this.createSlotsRow(height * 0.2, 'opponent-slots');
-        this.createCardsRow(height * 0.2, 'opponent-cards', this.opponent.hand);
+        this.createSlotsRow(height * 0.18, 'opponent-slots');
+        this.createCardsRow(height * 0.18, 'opponent-cards', this.opponent.hand);
 
         // ---------- CENTRO (campo de batalla con 6 espacios) ----------
-        this.createSlotsRow(height / 2 - battleRowYOffset, 'opponent_battle_slots', 6); // Fila del oponente
-        this.createSlotsRow(height / 2 + battleRowYOffset, 'player_battle_slots', 6);   // Fila del jugador
+        this.createSlotsRow(height * 0.45 - battleRowYOffset, 'opponent_battle_slots', 6); // Fila del oponente
+        this.createSlotsRow(height * 0.55 + battleRowYOffset, 'player_battle_slots', 6);   // Fila del jugador
 
         // ---------- ZONA DE MANO DEL JUGADOR (4 espacios) ----------
-        this.createSlotsRow(height * 0.8, 'player-slots');
-        this.createCardsRow(height * 0.8, 'player-cards', this.player.hand);
+        this.createSlotsRow(height * 0.82, 'player-slots');
+        this.createCardsRow(height * 0.819, 'player-cards', this.player.hand);
 
         // ---------- MAZOS ----------
         this.createDecks();
@@ -124,7 +123,7 @@ export default class GameScene extends Phaser.Scene {
                 gameObject.x = dropZone.x;
                 gameObject.y = dropZone.y;
                 // ¡AQUÍ ESTÁ LA CORRECCIÓN! Ajustamos la escala de la carta para que encaje en el campo.
-                gameObject.setScale(0.8);
+                gameObject.setScale(0.82);
 
                 // La carta en el campo ahora es clickeable para atacar
                 gameObject.setInteractive({ cursor: 'crosshair' });
@@ -167,7 +166,7 @@ export default class GameScene extends Phaser.Scene {
     createSlotsRow(y, name, numSlots = 4) { // Por defecto crea 4 slots
         const slots = [];
         const slotWidth = 110; // Ancho reducido para 1280px
-        const slotSpacing = 10; // Espacio reducido
+        const slotSpacing = 35; // Espacio reducido
         const positionsX = calculateRowPositions({
             numItems: numSlots,
             itemWidth: slotWidth,
@@ -177,8 +176,8 @@ export default class GameScene extends Phaser.Scene {
 
         for (let i = 0; i < numSlots; i++) {
             let slot = this.add.image(positionsX[i], y, 'slot')
-                .setScale(0.1) // Escala reducida
-                .setAlpha(0.55)
+                .setScale(0.25) // Escala reducida
+                .setAlpha(0.6)
                 .setName(`${name}-${i}`); // Asignamos un nombre único para identificarlo
 
             // Si es un slot del campo de batalla del jugador, lo hacemos una zona de drop
@@ -197,7 +196,7 @@ export default class GameScene extends Phaser.Scene {
         const cards = [];
         const numCards = hand.length;
         const cardWidth = 110; // Ancho reducido
-        const cardSpacing = 10; // Espacio reducido
+        const cardSpacing = 35; // Espacio reducido
         const positionsX = calculateRowPositions({
             numItems: numCards,
             itemWidth: cardWidth,
@@ -225,7 +224,7 @@ export default class GameScene extends Phaser.Scene {
     createPlayerCard(x, y, cardData) {
         const texture = `card-${cardData.type}-1`; // Anverso
         let card = this.add.image(x, y, texture)
-            .setScale(0.8) // Escala reducida
+            .setScale(0.82) // Escala reducida
             .setInteractive({ cursor: 'pointer', draggable: true }); // Hacemos la carta arrastrable
         card.setData('cardData', cardData); // Guardamos los datos de la carta
 
@@ -280,7 +279,7 @@ export default class GameScene extends Phaser.Scene {
         }
 
         // Volvemos a crear las cartas con la mano actualizada
-        this.createCardsRow(this.scale.height * 0.8, 'player-cards', this.player.hand);
+        this.createCardsRow(this.scale.height * 0.82, 'player-cards', this.player.hand);
         console.log('Mano del jugador refrescada.');
     }
 
@@ -299,12 +298,12 @@ export default class GameScene extends Phaser.Scene {
         const { width, height } = this.scale;
 
         // Mazo del jugador
-        this.add.image(width - 270, height - 140, 'card-back-player').setScale(0.14);
-        this.playerDeckText = this.add.text(width - 270, height - 140, this.player.deck.getCardsCount(), { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+        this.add.image(width - 120, height - 290, 'card-back-player').setScale(0.185);
+        this.playerDeckText = this.add.text(width - 120, height - 290, this.player.deck.getCardsCount(), { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
 
         // Mazo del oponente
-        this.add.image(270, 140, 'card-back-opponent').setScale(0.14);
-        this.opponentDeckText = this.add.text(270, 140, this.opponent.deck.getCardsCount(), { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+        this.add.image(120, 290, 'card-back-opponent').setScale(0.185);
+        this.opponentDeckText = this.add.text(120, 290, this.opponent.deck.getCardsCount(), { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
     }
 
     // Actualizar contadores de mazos
