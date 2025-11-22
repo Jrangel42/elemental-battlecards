@@ -63,6 +63,9 @@ export default class GameScene extends Phaser.Scene {
             .setOrigin(0.5)
             .setDisplaySize(width, height);
 
+        // ¡AQUÍ ESTÁ LA CORRECCIÓN! Enviamos el tablero al fondo de la lista de renderizado.
+        this.board.setDepth(-1);
+
         // ---------- ZONA DE MANO DEL OPONENTE (4 espacios) ----------
         this.createSlotsRow(height * 0.2, 'opponent-slots');
         this.createCardsRow(height * 0.2, 'opponent-cards', this.opponent.hand);
@@ -87,6 +90,77 @@ export default class GameScene extends Phaser.Scene {
             console.log('El turno ha terminado en GameScene. Ahora sería el turno del oponente.');
             // Aquí iría la lógica para que juegue el oponente.
         });
+
+        // --- Lógica de Arrastrar y Soltar (Drag and Drop) ---
+        this.input.on('drag', (pointer, gameObject, dragX, dragY) => {
+            gameObject.x = dragX;
+            gameObject.y = dragY;
+        });
+
+        this.input.on('dragstart', (pointer, gameObject) => {
+            this.children.bringToTop(gameObject); // Traer la carta al frente
+            // Guardamos la posición original de la carta
+            gameObject.setData('startPosition', { x: gameObject.x, y: gameObject.y });
+            gameObject.setData('dropped', false); // Bandera para saber si se soltó en una zona válida
+        });
+
+        this.input.on('drop', (pointer, gameObject, dropZone) => {
+            const cardData = gameObject.getData('cardData');
+            console.log(`Carta ${cardData.id} soltada en zona: ${dropZone.name}`);
+
+            // Obtenemos el índice del slot del campo de batalla (ej: de 'player_battle_slots-2' extraemos 2)
+            const fieldIndex = parseInt(dropZone.name.split('-')[1]);
+
+            // --- LÓGICA DE REPONER CARTA ---
+            // 1. Actualizar el modelo de datos del jugador PRIMERO
+            // Usamos el método para mover la carta de la mano al campo
+            const cardPlayed = this.player.playCardFromHand(cardData.id, fieldIndex);
+
+            // 2. Si la carta se pudo jugar (el slot estaba libre)...
+            if (cardPlayed) {
+                gameObject.setData('dropped', true); // Marcamos que el drop fue exitoso
+
+                // Movemos el objeto visualmente al slot
+                gameObject.x = dropZone.x;
+                gameObject.y = dropZone.y;
+                // ¡AQUÍ ESTÁ LA CORRECCIÓN! Ajustamos la escala de la carta para que encaje en el campo.
+                gameObject.setScale(0.8);
+
+                // La carta en el campo ahora es clickeable para atacar
+                gameObject.setInteractive({ cursor: 'crosshair' });
+
+                // Añadimos el listener para el ataque.
+                gameObject.on('pointerdown', () => this.handleAttack(gameObject));
+
+                // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
+                // Quitamos la carta jugada del array de la mano ANTES de refrescar.
+                this['player-cards'] = this['player-cards'].filter(card => card !== gameObject);
+
+                // 3. Robamos una nueva carta y actualizamos la vista
+                this.player.drawCard();
+                this.refreshPlayerHand();
+                this.updateDeckCounts();
+            } else {
+                // Si no se pudo jugar (ej: slot ocupado), no hacemos nada aquí.
+                // El evento 'dragend' se encargará de devolver la carta a la mano.
+                console.log('El slot ya estaba ocupado. La carta volverá a la mano.');
+            }
+        });
+
+        this.input.on('dragend', (pointer, gameObject) => {
+            // Si la carta no se soltó en una zona válida (o el slot estaba ocupado), la devolvemos a su lugar
+            if (!gameObject.getData('dropped')) {
+                const startPosition = gameObject.getData('startPosition');
+                // Usamos un tween para una animación suave de retorno
+                this.tweens.add({
+                    targets: gameObject,
+                    x: startPosition.x,
+                    y: startPosition.y,
+                    duration: 200, // Duración de la animación en ms
+                    ease: 'Power1'
+                });
+            }
+        });
     }
 
     // Crear fila de slots
@@ -104,7 +178,13 @@ export default class GameScene extends Phaser.Scene {
         for (let i = 0; i < numSlots; i++) {
             let slot = this.add.image(positionsX[i], y, 'slot')
                 .setScale(0.1) // Escala reducida
-                .setAlpha(0.55);
+                .setAlpha(0.55)
+                .setName(`${name}-${i}`); // Asignamos un nombre único para identificarlo
+
+            // Si es un slot del campo de batalla del jugador, lo hacemos una zona de drop
+            if (name === 'player_battle_slots') {
+                slot.setInteractive({ dropZone: true });
+            }
 
             slots.push(slot);
         }
@@ -146,28 +226,62 @@ export default class GameScene extends Phaser.Scene {
         const texture = `card-${cardData.type}-1`; // Anverso
         let card = this.add.image(x, y, texture)
             .setScale(0.8) // Escala reducida
-            .setInteractive({ cursor: 'pointer' });
+            .setInteractive({ cursor: 'pointer', draggable: true }); // Hacemos la carta arrastrable
         card.setData('cardData', cardData); // Guardamos los datos de la carta
 
-        // --- LÓGICA DE EJEMPLO PARA ACTIVAR ESENCIAS ---
-        card.on('pointerdown', () => {
-            const type = cardData.type;
-            
-            // 1. Comprobamos si la esencia ya está activa en el modelo de datos del jugador
-            if (!this.player.essences.has(type)) {
-                console.log(`%c[GameScene] Jugador intenta activar esencia ${type}`, "color: #ffaa00");
-                
-                // 2. La activamos en el modelo de datos
-                this.player.essences.activate(type);
+        // Habilitamos el drag en el input manager de Phaser
+        this.input.setDraggable(card);
 
-                // 3. Emitimos el evento global para que la UIScene (y cualquier otra) se entere
-                this.game.events.emit('essence-activated', this.player.id, type);
 
-                // Aquí podrías añadir lógica para mover la carta al campo, etc.
-            }
-        });
+        // --- LÓGICA DE ACTIVAR ESENCIAS (ELIMINADA DE AQUÍ) ---
+        // Se ha quitado el listener 'pointerdown' que activaba las esencias incorrectamente.
+        // La nueva lógica se gestiona al soltar la carta en el campo y al atacar.
 
         return card;
+    }
+
+    /**
+     * Gestiona el intento de ataque de una carta del jugador.
+     * Aquí se aplica la nueva lógica de activación de esencias.
+     * @param {Phaser.GameObjects.Image} attackingCardObject El objeto de la carta que ataca.
+     */
+    handleAttack(attackingCardObject) {
+        const cardData = attackingCardObject.getData('cardData');
+        console.log(`%c[GameScene] Jugador ataca con ${cardData.type} (ID: ${cardData.id})`, "color: #ff69b4");
+
+        // Condición 1: Comprobar si el campo del oponente está vacío.
+        const opponentFieldIsEmpty = this.opponent.field.every(slot => slot === null);
+
+        // Condición 2: El jugador realiza un ataque (este método es la prueba de ello).
+        if (opponentFieldIsEmpty) {
+            console.log('%cEl campo del oponente está vacío. ¡Ataque directo!', 'color: #ff69b4');
+            
+            // Si la esencia de ese tipo NO está llena, la llenamos.
+            if (!this.player.essences.has(cardData.type)) {
+                this.player.essences.activate(cardData.type);
+                this.game.events.emit('essence-activated', this.player.id, cardData.type);
+            } else {
+                console.log(`La esencia de ${cardData.type} ya estaba llena. No pasa nada.`);
+            }
+        } else {
+            console.log('El oponente tiene cartas. El combate debería resolverse aquí.');
+            // Aquí iría la lógica futura para seleccionar una carta defensora y llamar a resolveCombat().
+        }
+    }
+
+    /**
+     * Destruye las cartas actuales de la mano del jugador y las vuelve a crear.
+     * Es útil para cuando la mano cambia (robar, descartar, etc.).
+     */
+    refreshPlayerHand() {
+        // Destruimos los objetos de juego de las cartas anteriores
+        if (this['player-cards']) {
+            this['player-cards'].forEach(card => card.destroy());
+        }
+
+        // Volvemos a crear las cartas con la mano actualizada
+        this.createCardsRow(this.scale.height * 0.8, 'player-cards', this.player.hand);
+        console.log('Mano del jugador refrescada.');
     }
 
     // Crear carta del oponente
@@ -191,5 +305,12 @@ export default class GameScene extends Phaser.Scene {
         // Mazo del oponente
         this.add.image(270, 140, 'card-back-opponent').setScale(0.14);
         this.opponentDeckText = this.add.text(270, 140, this.opponent.deck.getCardsCount(), { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+    }
+
+    // Actualizar contadores de mazos
+    updateDeckCounts() {
+        this.playerDeckText.setText(this.player.deck.getCardsCount());
+        this.opponentDeckText.setText(this.opponent.deck.getCardsCount());
+        console.log('Contadores de mazo actualizados.');
     }
 }

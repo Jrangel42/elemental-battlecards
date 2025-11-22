@@ -167,7 +167,7 @@ export default class UIScene extends Phaser.Scene {
             targetOrb.clearTint();
             this.tweens.add({
                 targets: targetOrb,
-                scale: { from: 0.6, to: 0.8 },
+                scale: 0.08 ,
                 duration: 200,
                 yoyo: true,
                 ease: 'Power1'

@@ -72,6 +72,24 @@ export default class Player {
     }
 
     /**
+     * Mueve una carta de la mano a un slot específico del campo de batalla.
+     * @param {string} cardId El ID de la carta a jugar.
+     * @param {number} fieldIndex El índice del slot en el campo (0-5).
+     * @returns {Card|null} La carta jugada o null si no se pudo.
+     */
+    playCardFromHand(cardId, fieldIndex) {
+        const cardIndex = this.hand.findIndex(card => card.id === cardId);
+        if (cardIndex > -1 && this.field[fieldIndex] === null) {
+            const cardToPlay = this.hand.splice(cardIndex, 1)[0]; // Saca la carta de la mano
+            this.field[fieldIndex] = cardToPlay; // Coloca la carta en el campo
+            console.log(`[Player] Carta ${cardId} movida al slot ${fieldIndex} del campo.`);
+            return cardToPlay;
+        }
+        console.warn(`[Player] No se pudo jugar la carta ${cardId} en el slot ${fieldIndex}.`);
+        return null;
+    }
+
+    /**
      * Añade los datos de una carta al cementerio.
      * Si la carta es de nivel 2 o 3, la descompone en cartas de nivel 1.
      * @param {Card} card El objeto Card que ha sido derrotado.
