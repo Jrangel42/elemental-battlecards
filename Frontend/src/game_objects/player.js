@@ -1,5 +1,6 @@
 import Deck from './deck.js';
 import Card, { CardTypes } from './card.js';
+import EssenceManager from './essences.js';
 
 /**
  * Gestiona el estado completo de un jugador, incluyendo su mazo, mano, campo,
@@ -15,6 +16,7 @@ export default class Player {
         this.scene = scene;
 
         this.deck = new Deck(id);
+        this.essences = new EssenceManager();
 
         /** @type {Card[]} */
         this.hand = [];
@@ -24,16 +26,6 @@ export default class Player {
 
         /** @type {object[]} */
         this.graveyard = []; // Guardaremos los datos de las cartas, no los sprites
-
-        // Inicializa las esencias, todas vacías (false)
-        this.essences = {
-            [CardTypes.FUEGO]: false,
-            [CardTypes.AGUA]: false,
-            [CardTypes.PLANTA]: false,
-            [CardTypes.LUZ]: false,
-            [CardTypes.SOMBRA]: false,
-            [CardTypes.ESPIRITU]: false,
-        };
 
         this.turnsWithoutAttacking = 0;
     }

@@ -10,14 +10,14 @@ import HomeScene from './scenes/homeScenes.js';
 const config = {
     type: Phaser.AUTO,
     dom: { createContainer: true }, // Importante para que funcionen los elementos DOM
-    width: 1280,
-    height: 720,
+    width: 1440,
+    height: 1024,
     scale: {
         mode: Phaser.Scale.FIT, // Ajusta el juego al contenedor manteniendo la proporción
         autoCenter: Phaser.Scale.CENTER_BOTH // Centra el canvas automáticamente
     },
     parent: 'game-container',
-    scene: [GameScene, HomeScene, LoginScene, RegisterScene, PreloaderScene,  UIScene] // Se cargarán en este orden
+    scene: [GameScene, LoginScene, HomeScene, PreloaderScene,   RegisterScene, UIScene] // Se cargarán en este orden
 };
 
 const game = new Phaser.Game(config);

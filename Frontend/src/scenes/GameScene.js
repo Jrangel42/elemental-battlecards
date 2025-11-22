@@ -40,14 +40,6 @@ export default class GameScene extends Phaser.Scene {
         //mazo reverso
         this.load.image('card-back-opponent', '/assets/images/cartas/baraja oponente.png');
         this.load.image('card-back-player', '/assets/images/cartas/baraja jugador.png');
-
-        // Otros iconos del tablero
-        this.load.image('orb-fire', '/assets/icons/fuego.png');
-        this.load.image('orb-water', '/assets/icons/agua.png');
-        this.load.image('orb-plant', '/assets/icons/planta.png');
-        this.load.image('orb-light', '/assets/icons/luz.png');
-        this.load.image('orb-spirit', '/assets/icons/espiritu.png');
-        this.load.image('orb-shadow', '/assets/icons/sombra.png');
     }
 
     create() {
@@ -156,6 +148,25 @@ export default class GameScene extends Phaser.Scene {
             .setScale(0.8) // Escala reducida
             .setInteractive({ cursor: 'pointer' });
         card.setData('cardData', cardData); // Guardamos los datos de la carta
+
+        // --- LÓGICA DE EJEMPLO PARA ACTIVAR ESENCIAS ---
+        card.on('pointerdown', () => {
+            const type = cardData.type;
+            
+            // 1. Comprobamos si la esencia ya está activa en el modelo de datos del jugador
+            if (!this.player.essences.has(type)) {
+                console.log(`%c[GameScene] Jugador intenta activar esencia ${type}`, "color: #ffaa00");
+                
+                // 2. La activamos en el modelo de datos
+                this.player.essences.activate(type);
+
+                // 3. Emitimos el evento global para que la UIScene (y cualquier otra) se entere
+                this.game.events.emit('essence-activated', this.player.id, type);
+
+                // Aquí podrías añadir lógica para mover la carta al campo, etc.
+            }
+        });
+
         return card;
     }
 
