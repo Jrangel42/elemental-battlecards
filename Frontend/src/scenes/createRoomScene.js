@@ -1,22 +1,22 @@
 import Phaser from "phaser";
 
-export default class HomeScene extends Phaser.Scene {
-    constructor() { super("HomeScene"); this.playerData = null; }
+export default class CreateRoomScene extends Phaser.Scene {
+    constructor() { super("CreateRoomScene"); this.playerData = null; }
 
     init(data) {
         this.playerData = data;
-        console.log('HomeScene iniciada con los datos del jugador:', this.playerData);
+        console.log('CreateRoomScene iniciada con los datos del jugador:', this.playerData);
     }
 
     preload() {
         // No es necesario precargar las imágenes aquí, ya que el HTML/CSS las cargarán directamente.
         // Corregido: Sí necesitamos cargar el fondo para que Phaser lo gestione.
         this.load.image('home-background', '/assets/images/home.png');
-        console.log("%c[HomeScene] Precargando assets...", "color: #9f7bff");
+        console.log("%c[CreateRoomScene] Precargando assets...", "color: #9f7bff");
     }
 
     create() {
-        console.log(`%c[HomeScene] ¡Bienvenido, ${this.playerData.username}!`, "color: #9f7bff");
+        console.log(`%c[CreateRoomScene] ¡Bienvenido, ${this.playerData.username}!`, "color: #9f7bff");
         const { width, height } = this.scale;
 
         // 1. Añadimos el fondo como una imagen de Phaser (igual que en LoginScene)
@@ -46,7 +46,7 @@ export default class HomeScene extends Phaser.Scene {
             <style>
                 .home-container {
                     width: 100%;
-                    height: 100%;
+                    height: 100%; /* Usa vh para asegurar que ocupe toda la altura de la ventana */
                     font-family: Poppins, Arial, sans-serif;
                     color: white;
                     overflow: hidden; /* Evita barras de scroll dentro del elemento DOM */
@@ -96,35 +96,6 @@ export default class HomeScene extends Phaser.Scene {
                     margin-bottom: 10px; transition: 0.2s;
                 }
                 .btn-primary:hover { background: #b24cff; }
-
-                /* --- Estilos del Modal --- */
-                .modal-overlay {
-                    position: fixed; /* Usamos fixed para cubrir toda la ventana del juego */
-                    top: 0; left: 0; width: 100%; height: 100%;
-                    background: rgba(0, 0, 0, 0.7);
-                    display: flex; align-items: center; justify-content: center;
-                    z-index: 1000; /* Asegura que esté por encima de todo */
-                    opacity: 0;
-                    visibility: hidden;
-                    transition: opacity 0.3s, visibility 0.3s;
-                }
-                .modal-overlay.visible {
-                    opacity: 1;
-                    visibility: visible;
-                }
-                .modal-content {
-                    width: 500px;
-                    max-width: 90%;
-                    padding: 30px;
-                    border-radius: 12px;
-                    background: rgba(20, 20, 30, 0.85);
-                    backdrop-filter: blur(10px);
-                    box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
-                    position: relative;
-                }
-                .modal-content h2 { margin-top: 0; color: #8a00ff; }
-                .modal-content p { line-height: 1.6; }
-                .modal-close-btn { position: absolute; top: 15px; right: 15px; background: none; border: none; color: white; font-size: 24px; cursor: pointer; }
             </style>
 
             <div class="home-container">
@@ -152,63 +123,13 @@ export default class HomeScene extends Phaser.Scene {
                         </div>
                     </section>
                 </main>
-
-                <!-- Modal Genérico -->
-                <div id="modal-container" class="modal-overlay">
-                    <div class="modal-content glass">
-                        <button id="modal-close-btn" class="modal-close-btn">&times;</button>
-                        <h2 id="modal-title">Título del Modal</h2>
-                        <p id="modal-text">Contenido del modal...</p>
-                    </div>
-                </div>
             </div>
         `;
 
         // 2. Creamos el elemento DOM y lo centramos
         this.homeElement = this.add.dom(width / 2, height / 2).createFromHTML(sceneHTML);
 
-        
         // --- LÓGICA DE LOS BOTONES ---
-
-        // Elementos del DOM
-        const homeNode = this.homeElement.node;
-        const modalContainer = homeNode.querySelector('#modal-container');
-        const modalTitle = homeNode.querySelector('#modal-title');
-        const modalText = homeNode.querySelector('#modal-text');
-        const btnCloseModal = homeNode.querySelector('#modal-close-btn');
-
-        /**
-         * Muestra el modal con un título y contenido específicos.
-         * @param {string} title - El título a mostrar en el modal.
-         * @param {string} content - El texto a mostrar en el modal.
-         */
-        const showModal = (title, content) => {
-            modalTitle.textContent = title;
-            modalText.innerHTML = content; // Usamos innerHTML para poder añadir <br> si es necesario
-            modalContainer.classList.add('visible');
-        };
-
-        // Función para cerrar el modal
-        const closeModal = () => {
-            modalContainer.classList.remove('visible');
-        };
-
-        // Listeners para los botones de acción
-        homeNode.querySelector('#btn-settings').addEventListener('click', () => {
-            showModal('Configuración', 'Aquí irán las opciones de configuración del juego, como el volumen, los gráficos y los controles.');
-        });
-
-        homeNode.querySelector('#btn-about').addEventListener('click', () => {
-            showModal('Acerca de', 'Elemental Battlecards es un juego de cartas estratégico desarrollado por un equipo apasionado. ¡Gracias por jugar!');
-        });
-
-        homeNode.querySelector('#btn-mechanics').addEventListener('click', () => {
-            showModal('Mecánicas del Juego', 'El objetivo es derrotar a tu oponente usando cartas elementales. Cada carta tiene sus propias fortalezas y debilidades. ¡Construye tu mazo sabiamente!');
-        });
-
-        // Listeners para cerrar el modal
-        btnCloseModal.addEventListener('click', closeModal);
-        modalContainer.addEventListener('click', (event) => { if (event.target === modalContainer) closeModal(); }); // Cierra si se hace clic en el fondo
 
         const btnExit = this.homeElement.node.querySelector('.btn-exit');
         btnExit.addEventListener('click', () => {
@@ -217,9 +138,18 @@ export default class HomeScene extends Phaser.Scene {
             this.scene.start("LoginScene");
         });
 
-        const btnPlay = this.homeElement.node.querySelector('#play-now-btn');
-        btnPlay.addEventListener('click', () => {
-            this.scene.start("GameScene", this.playerData);
+        const btnBack = this.homeElement.node.querySelector('#btn-back');
+        btnBack.addEventListener('click', () => {
+            this.scene.start("HomeScene", this.playerData);
+        });
+
+        const btnCreateRoom = this.homeElement.node.querySelector('#btn-create-room');
+        btnCreateRoom.addEventListener('click', () => {
+            const roomName = this.homeElement.node.querySelector('#room-name').value;
+            const password = this.homeElement.node.querySelector('#room-password').value;
+            console.log(`Creando sala... Nombre: ${roomName}, Contraseña: ${password || 'ninguna'}`);
+            // Aquí iría la lógica para conectar con el servidor y crear la sala.
+            // Por ahora, solo mostraremos un mensaje en consola.
         });
 
         // 3. Añadimos el listener para que la escena sea responsive
