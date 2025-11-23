@@ -139,8 +139,7 @@ export default class CreateRoomScene extends Phaser.Scene {
                 <section class="panel">
                     <h2 style="margin-bottom:20px">Unirse a sala</h2>
                     <p>Ingresa el código que te compartieron.</p>
-
-                    <input id="input-room-code" class="input-box" placeholder="XXX XXX" style="font-size:20px; color:white;" />
+                    <input id="input-room-code" class="input-box" placeholder="XXX XXX" style="font-size:20px; color:white;">
                     <button class="btn-primary" id="btn-join">Unirse a sala</button>
                 </section>
 
@@ -160,8 +159,15 @@ export default class CreateRoomScene extends Phaser.Scene {
         node.style.height = height + "px";
 
         // BUTTONS
-        node.querySelector(".btn-exit").onclick = () => this.scene.start("HomeScene");
-        node.querySelector("#btn-start").onclick = () => this.scene.start("GameScene");
+        const exitBtn = node.querySelector(".btn-exit");
+        const startBtn = node.querySelector("#btn-start");
+        if (exitBtn) exitBtn.addEventListener('click', () => {
+            // Use start to ensure the scene is launched/returned to reliably
+            this.scene.start("HomeScenes");
+        });
+        if (startBtn) startBtn.addEventListener('click', () => {
+            this.scene.start("GameScene");
+        });
 
         node.querySelector("#btn-join").onclick = () => {
             const code = node.querySelector("#input-room-code").value;
