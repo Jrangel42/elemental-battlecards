@@ -7,7 +7,7 @@ export default class RegisterScene extends Phaser.Scene {
 
     preload() {
         // Cargamos la imagen de fondo y el logo
-        this.load.image('inicio-bg', '/assets/images/inicio/inicio.webp');
+        this.load.image('inicio-bg', '/assets/images/inicio/inicio.png');
         this.load.image('logo', '/assets/images/logotipo.png');
 
         this.load.on('loaderror', (file) => {

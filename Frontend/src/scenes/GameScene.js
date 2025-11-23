@@ -433,17 +433,23 @@ export default class GameScene extends Phaser.Scene {
 
     // Crear carta del jugador
     createPlayerCard(x, y, cardData) {
-        // ¡AQUÍ ESTÁ EL CAMBIO! Usamos la clase Card.
-        // 1. Creamos la instancia. El constructor de Card ya la añade a la escena y la hace interactiva.
-        const card = new Card(this, x, y, cardData, false);
-        
-        // 2. Configuramos sus propiedades visuales y guardamos su posición/escala original.
-        card.setScale(0.95);
-        card.setData('startPosition', { x, y });
-        card.setData('startScale', card.scale);
+        const texture = `card-${cardData.type}-1`; // Anverso
+        let card = this.add.image(x, y, texture)
+<<<<<<< HEAD
+            .setScale(0.82) // Escala reducida
+=======
+            .setScale(0.95) // Escala reducida
+>>>>>>> 20061079201f7946cfd55ed4e4f9326869f67a49
+            .setInteractive({ cursor: 'pointer', draggable: true }); // Hacemos la carta arrastrable
+        card.setData('cardData', cardData); // Guardamos los datos de la carta
 
-        // 3. Añadimos el listener para el evento de clic.
-        card.on('pointerdown', () => this.onCardClicked(card));
+        // Habilitamos el drag en el input manager de Phaser
+        this.input.setDraggable(card);
+
+
+        // --- LÓGICA DE ACTIVAR ESENCIAS (ELIMINADA DE AQUÍ) ---
+        // Se ha quitado el listener 'pointerdown' que activaba las esencias incorrectamente.
+        // La nueva lógica se gestiona al soltar la carta en el campo y al atacar.
 
         return card;
     }
@@ -605,16 +611,21 @@ export default class GameScene extends Phaser.Scene {
         const padding = 5; // Pequeño espacio desde el borde.
 
         // Mazo del jugador
-        const playerDeckImage = this.add.image(width - 120, height - 290, 'card-back-player').setScale(0.185);
-        const playerDeckBounds = playerDeckImage.getBounds();
-        this.playerDeckText = this.add.text(playerDeckBounds.left + padding, playerDeckBounds.bottom - padding, this.player.deck.getCardsCount(), textStyle)
-            .setOrigin(0, 1); // Anclaje en la esquina inferior izquierda.
+<<<<<<< HEAD
+        this.add.image(width - 120, height - 290, 'card-back-player').setScale(0.185);
+        this.playerDeckText = this.add.text(width - 120, height - 290, this.player.deck.getCardsCount(), { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
 
         // Mazo del oponente
-        const opponentDeckImage = this.add.image(120, 290, 'card-back-opponent').setScale(0.185);
-        const opponentDeckBounds = opponentDeckImage.getBounds();
-        this.opponentDeckText = this.add.text(opponentDeckBounds.left + padding, opponentDeckBounds.bottom - padding, this.opponent.deck.getCardsCount(), textStyle)
-            .setOrigin(0, 1); // Anclaje en la esquina inferior izquierda.
+        this.add.image(120, 290, 'card-back-opponent').setScale(0.185);
+        this.opponentDeckText = this.add.text(120, 290, this.opponent.deck.getCardsCount(), { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+=======
+        this.add.image(width - 300, height - 250, 'card-back-player').setScale(0.25);
+        this.playerDeckText = this.add.text(width - 270, height - 140, this.player.deck.getCardsCount(), { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+
+        // Mazo del oponente
+        this.add.image(300, 240, 'card-back-opponent').setScale(0.25);
+        this.opponentDeckText = this.add.text(270, 140, this.opponent.deck.getCardsCount(), { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+>>>>>>> 20061079201f7946cfd55ed4e4f9326869f67a49
     }
 
     // Actualizar contadores de mazos
