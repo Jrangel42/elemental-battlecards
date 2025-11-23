@@ -1,4 +1,4 @@
-import { ADVANTAGES, CARD_LEVELS } from "./constants";
+import { ADVANTAGES } from "./constants";
 
 /**
  * Determina el resultado de un combate entre dos cartas.

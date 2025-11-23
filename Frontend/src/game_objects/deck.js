@@ -1,4 +1,5 @@
-import { CARD_TYPES, GAME_CONFIG } from '../helpers/constants';
+import { CARD_TYPES, GAME_CONFIG } from '../helpers/constants.js';
+import { CardDefinitions } from './card-definitions.js';
 
 /**
  * Gestiona un conjunto de cartas, como el mazo o el cementerio.
@@ -15,17 +16,18 @@ export default class Deck {
      */
     createInitialDeck() {
         const deck = [];
-        const types = Object.values(CARD_TYPES); // ['fuego', 'agua', ...]
+        const types = Object.values(CARD_TYPES); // ['fuego', 'agua', ...] -> Obtenemos los tipos de carta de las constantes
         const copiesPerType = GAME_CONFIG.INITIAL_DECK_SIZE / types.length; // 48 / 6 = 8
 
         for (const type of types) {
+            // Buscamos la definición de la carta de nivel 1 para este tipo
+            const cardDefinition = CardDefinitions[`${type}-1`];
+            if (!cardDefinition) continue; // Si no se encuentra, saltamos a la siguiente
+
             for (let copyIndex = 0; copyIndex < copiesPerType; copyIndex++) {
                 deck.push({
-                    id: `${type}-${copyIndex}`,
-                    type: type,
-                    level: 1,
-                    state: 'in_deck',
-                    owner: this.ownerId
+                    ...cardDefinition, // Copiamos todas las propiedades base de la definición
+                    owner: this.ownerId // Y añadimos el propietario
                 });
             }
         }

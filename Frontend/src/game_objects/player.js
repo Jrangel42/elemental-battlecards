@@ -1,5 +1,6 @@
 import Deck from './deck.js';
-import Card, { CardTypes } from './card.js';
+import Card from './card.js'; // CORRECCIÓN: Solo se importa el default, no 'CardTypes'
+import { CardDefinitions } from './card-definitions.js';
 import EssenceManager from './essences.js';
 
 /**
@@ -56,6 +57,10 @@ export default class Player {
         if (cardData) {
             // En lugar de crear el sprite aquí, lo añadimos a la mano como datos.
             // La escena se encargará de crear el sprite cuando sea necesario mostrarlo.
+            // --- ¡AQUÍ ESTÁ LA CORRECCIÓN CLAVE! ---
+            // Asignamos un ID de instancia único en el momento en que la carta entra en la mano.
+            // Esto nos permite rastrearla de forma única a lo largo de todo su ciclo de vida.
+            cardData.instanceId = Phaser.Math.RND.uuid();
             this.hand.push(cardData);
         }
         return cardData;
@@ -73,36 +78,115 @@ export default class Player {
 
     /**
      * Mueve una carta de la mano a un slot específico del campo de batalla.
-     * @param {string} cardId El ID de la carta a jugar.
+     * @param {string} instanceId El ID de instancia único de la carta a jugar.
      * @param {number} fieldIndex El índice del slot en el campo (0-5).
      * @returns {Card|null} La carta jugada o null si no se pudo.
      */
-    playCardFromHand(cardId, fieldIndex) {
-        const cardIndex = this.hand.findIndex(card => card.id === cardId);
+    playCardFromHand(instanceId, fieldIndex) {
+        const cardIndex = this.hand.findIndex(card => card.instanceId === instanceId);
         if (cardIndex > -1 && this.field[fieldIndex] === null) {
             const cardToPlay = this.hand.splice(cardIndex, 1)[0]; // Saca la carta de la mano
-            this.field[fieldIndex] = cardToPlay; // Coloca la carta en el campo
-            console.log(`[Player] Carta ${cardId} movida al slot ${fieldIndex} del campo.`);
+
+            this.field[fieldIndex] = cardToPlay; // Coloca la nueva instancia en el campo
+
+            console.log(`[Player] Carta con instanceId ${instanceId} movida al slot ${fieldIndex} del campo.`);
             return cardToPlay;
         }
-        console.warn(`[Player] No se pudo jugar la carta ${cardId} en el slot ${fieldIndex}.`);
+        console.warn(`[Player] No se pudo jugar la carta con instanceId ${instanceId} en el slot ${fieldIndex}.`);
         return null;
     }
 
     /**
-     * Añade los datos de una carta al cementerio.
-     * Si la carta es de nivel 2 o 3, la descompone en cartas de nivel 1.
-     * @param {Card} card El objeto Card que ha sido derrotado.
+     * Fusiona dos cartas en el campo.
+     * @param {number} draggedIndex El índice de la carta arrastrada.
+     * @param {number} targetIndex El índice de la carta objetivo.
+     * @returns {{newCard: object, emptiedIndex: number}|null} Un objeto con la nueva carta y el índice del slot vaciado.
      */
-    addCardToGraveyard(card) {
-        const baseCardsCount = Math.pow(2, card.level - 1);
-        console.log(`Añadiendo ${baseCardsCount} carta(s) base de tipo ${card.type} al cementerio.`);
+    fuseCards(draggedIndex, targetIndex) {
+        const card1 = this.field[draggedIndex];
+        const card2 = this.field[targetIndex];
 
-        for (let i = 0; i < baseCardsCount; i++) {
-            this.graveyard.push({ type: card.type, owner: this.id });
+        // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
+        // Buscamos la definición de la carta de nivel superior en nuestra base de datos.
+        const newLevel = card1.level + 1;
+        const newCardId = `${card1.type}-${newLevel}`; // Ej: 'sombra-2'
+        const newCardData = CardDefinitions[newCardId];
+
+        if (!newCardData) {
+            console.error(`[Player] No se encontró la definición para la carta fusionada con ID: ${newCardId}`);
+            return null;
         }
 
-        // Destruimos el sprite de la carta del juego para liberar memoria
-        card.destroy();
+        // Creamos una nueva instancia de la carta fusionada.
+        const newCardInstance = { ...newCardData, instanceId: Phaser.Math.RND.uuid() };
+
+        // Actualizamos el campo: la nueva carta ocupa el lugar de la carta objetivo.
+        // El slot de la carta arrastrada se vacía.
+        this.field[targetIndex] = newCardInstance;
+        this.field[draggedIndex] = null;
+
+        console.log(`Modelo actualizado: Carta ${newCardInstance.id} (Nivel ${newCardInstance.level}) creada en el slot ${targetIndex}`);
+        return { newCard: newCardInstance, emptiedIndex: draggedIndex };
+    }
+
+    /**
+     * Fusiona una carta de la mano con una carta en el campo.
+     * @param {string} cardId El ID de la carta en la mano.
+     * @param {number} targetIndex El índice de la carta objetivo en el campo.
+     * @returns {object|null} Los datos de la nueva carta fusionada o null si falla.
+     */
+    fuseFromHand(instanceId, targetIndex) {
+        const cardFromHandIndex = this.hand.findIndex(c => c.instanceId === instanceId);
+        const cardOnField = this.field[targetIndex];
+
+        if (cardFromHandIndex === -1 || !cardOnField) return null;
+
+        const cardFromHand = this.hand[cardFromHandIndex];
+
+        // Validación de compatibilidad
+        if (cardFromHand.type !== cardOnField.type || cardFromHand.level !== cardOnField.level) {
+            return null;
+        }
+
+        // Saca la carta de la mano
+        this.hand.splice(cardFromHandIndex, 1);
+
+        // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
+        // Buscamos la definición de la carta de nivel superior.
+        const newLevel = cardOnField.level + 1;
+        const newCardId = `${cardOnField.type}-${newLevel}`; // Ej: 'fuego-3'
+        const newCardData = CardDefinitions[newCardId];
+
+        if (!newCardData) {
+            console.error(`[Player] No se encontró la definición para la carta fusionada con ID: ${newCardId}`);
+            return null;
+        }
+
+        // --- ¡CORRECCIÓN! ---
+        // La carta en el campo que se usa para la fusión debe ir al cementerio.
+        // La añadimos al cementerio antes de reemplazarla.
+        this.addCardDataToGraveyard(cardOnField);
+
+        const newCardInstance = { ...newCardData, instanceId: Phaser.Math.RND.uuid() };
+
+        // Reemplazamos la carta en el campo con la nueva carta fusionada
+        this.field[targetIndex] = newCardInstance;
+
+        return newCardInstance;
+    }
+    /**
+     * Añade los datos de una carta (objeto de datos, no sprite) al cementerio.
+     * Si la carta es de nivel 2 o 3, la descompone en cartas de nivel 1.
+     * @param {object} cardData Los datos de la carta que ha sido derrotada.
+     */
+    addCardDataToGraveyard(cardData) {
+        const baseCardsCount = Math.pow(2, cardData.level - 1);
+        console.log(`Añadiendo ${baseCardsCount} carta(s) base de tipo ${cardData.type} al cementerio.`);
+
+        for (let i = 0; i < baseCardsCount; i++) {
+            // Solo guardamos la información esencial para reconstruir la carta base.
+            const baseCardId = `${cardData.type}-1`;
+            this.graveyard.push({ id: baseCardId, type: cardData.type, level: 1 });
+        }
     }
 }

@@ -1,4 +1,4 @@
-import { CardTypes } from '../game_objects/card.js';
+import { CARD_TYPES as CardTypes } from '../helpers/constants.js';
 
 /**
  * Esta escena se encarga de cargar todos los recursos necesarios para el juego

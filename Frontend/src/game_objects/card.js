@@ -1,16 +1,4 @@
 /**
- * Define los tipos de cartas para evitar errores de tipeo y facilitar el mantenimiento.
- */
-export const CardTypes = {
-    FUEGO: 'fuego',
-    AGUA: 'agua',
-    PLANTA: 'planta',
-    LUZ: 'luz',
-    SOMBRA: 'sombra',
-    ESPIRITU: 'espiritu'
-};
-
-/**
  * Representa una carta en el juego. Extiende de Phaser.GameObjects.Sprite para tener
  * una representación visual y manejar la interacción.
  */
@@ -25,26 +13,30 @@ export default class Card extends Phaser.GameObjects.Sprite {
      * @param {number} [level=1] El nivel de la carta.
      * @param {boolean} [isFaceDown=true] Si la carta está boca abajo.
      */
-    constructor(scene, x, y, owner, type, level = 1, isFaceDown = true) {
+    constructor(scene, x, y, cardData, isFaceDown = true) {
         // La textura inicial será el reverso de la carta. Asumimos que se carga con la key 'card_back'.
-        super(scene, x, y, 'card_back');
+        super(scene, x, y, isFaceDown ? 'card-back-player' : `card-${cardData.type}-${cardData.level}`);
 
         this.scene = scene;
-        this.owner = owner;
-        this.type = type;
-        this.level = level;
+        this.cardData = cardData; // Guardamos todos los datos
+        this.type = cardData.type;
+        this.level = cardData.level;
         this.isFaceDown = isFaceDown;
+
+        // --- ¡AQUÍ ESTÁ LA EXPLICACIÓN! ---
+        // Asignamos un nombre al GameObject para facilitar la depuración.
+        this.setName(cardData.instanceId); // Ahora el 'name' será el ID único de la carta.
 
         // Propiedades para las reglas de ataque
         this.canAttack = true;
         this.attackCooldown = 0; // Turnos que debe esperar para atacar
         this.consecutiveAttacks = 0; // Para la regla del nivel 2
 
-        // Hacemos la carta interactiva para poder hacer clic en ella
-        this.setInteractive();
-
-        // Añadimos la carta a la escena
+        // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
+        // 1. Añadimos la carta a la escena PRIMERO.
         scene.add.existing(this);
+        // 2. Hacemos la carta interactiva DESPUÉS de que esté en la escena.
+        this.setInteractive();
 
         // Si la carta no está boca abajo desde el principio (ej. por fusión), la revelamos
         if (!this.isFaceDown) {
@@ -59,8 +51,8 @@ export default class Card extends Phaser.GameObjects.Sprite {
     reveal() {
         if (this.isFaceDown) {
             this.isFaceDown = false;
-            // Asumimos que las texturas de las cartas se llaman, por ejemplo, 'fuego_1', 'agua_2', etc.
-            const textureName = `${this.type}_${this.level}`;
+            // La textura usa el formato 'card-tipo-nivel'
+            const textureName = `card-${this.type}-${this.level}`;
             this.setTexture(textureName);
         }
     }
@@ -73,7 +65,7 @@ export default class Card extends Phaser.GameObjects.Sprite {
             this.level++;
             // Actualiza la textura si la carta ya está revelada
             if (!this.isFaceDown) {
-                const textureName = `${this.type}_${this.level}`;
+                const textureName = `card-${this.type}-${this.level}`;
                 this.setTexture(textureName);
             }
         }

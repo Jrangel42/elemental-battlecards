@@ -1,6 +1,9 @@
 import Phaser from 'phaser';
 import { calculateRowPositions } from '../helpers/zone';
+import { resolveCombat } from '../helpers/combat';
 import Player from '../game_objects/player.js';
+import Card from '../game_objects/card.js';
+import { CardDefinitions } from '../game_objects/card-definitions.js';
 
 /**
  * La escena principal donde se desarrolla el juego de cartas.
@@ -10,6 +13,7 @@ export default class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
         this.playerData = null; // Propiedad para guardar los datos del jugador
+        this.selectedCard = null; // Propiedad para la carta seleccionada
     }
 
     /**
@@ -28,13 +32,29 @@ export default class GameScene extends Phaser.Scene {
         // Slots
         this.load.image('slot', '/assets/images/cartas/Espacio vacio.png');
 
-        // Cartas
+        // Cartas nivel 1
         this.load.image('card-fuego-1', '/assets/images/cartas/carta fuego.png');
         this.load.image('card-agua-1', '/assets/images/cartas/carta agua.png');
         this.load.image('card-planta-1', '/assets/images/cartas/carta planta.png');
         this.load.image('card-luz-1', '/assets/images/cartas/carta luz.png');
         this.load.image('card-sombra-1', '/assets/images/cartas/carta sombra.png');
         this.load.image('card-espiritu-1', '/assets/images/cartas/carta espiritu.png');
+
+        //cartas nivel 2
+        this.load.image('card-fuego-2', '/assets/images/cartas/carta fuego 2.png');
+        this.load.image('card-agua-2', '/assets/images/cartas/carta agua 2.png');
+        this.load.image('card-planta-2', '/assets/images/cartas/carta planta 2.png');
+        this.load.image('card-luz-2', '/assets/images/cartas/carta luz 2.png');
+        this.load.image('card-sombra-2', '/assets/images/cartas/carta sombra 2.png');
+        this.load.image('card-espiritu-2', '/assets/images/cartas/carta espiritu 2.png');
+        
+        //cartas nivel 3
+        this.load.image('card-fuego-3', '/assets/images/cartas/carta fuego 3.png');
+        this.load.image('card-agua-3', '/assets/images/cartas/carta agua 3.png');
+        this.load.image('card-planta-3', '/assets/images/cartas/carta planta 3.png');
+        this.load.image('card-luz-3', '/assets/images/cartas/carta luz 3.png');
+        this.load.image('card-sombra-3', '/assets/images/cartas/carta sombra 3.png');
+        this.load.image('card-espiritu-3', '/assets/images/cartas/carta espiritu 3.png');
         
         //mazo reverso
         this.load.image('card-back-opponent', '/assets/images/cartas/baraja oponente.png');
@@ -83,6 +103,12 @@ export default class GameScene extends Phaser.Scene {
         // Avisar a la UI que la escena se creó exitosamente
         this.events.emit('board-ready');
 
+        // --- Lógica de Clic para Deseleccionar ---
+        // Si hacemos clic en el tablero, deseleccionamos cualquier carta.
+        this.board.setInteractive();
+        this.board.on('pointerdown', () => this.deselectCard());
+
+
         // --- Lógica de Turnos (Ejemplo) ---
         // Escuchamos el evento 'end-turn' que será emitido desde la UIScene.
         this.events.on('end-turn', () => {
@@ -90,76 +116,257 @@ export default class GameScene extends Phaser.Scene {
             // Aquí iría la lógica para que juegue el oponente.
         });
 
-        // --- Lógica de Arrastrar y Soltar (Drag and Drop) ---
-        this.input.on('drag', (pointer, gameObject, dragX, dragY) => {
-            gameObject.x = dragX;
-            gameObject.y = dragY;
+    }
+
+    /**
+     * Gestiona la lógica cuando un jugador intenta jugar una carta de la mano a un slot.
+     * @param {Phaser.GameObjects.Image} cardObject El objeto de la carta arrastrada.
+     * @param {Phaser.GameObjects.Image} dropZone El slot del campo de batalla.
+     */
+    handlePlayCard(cardObject, dropZone) {
+        // Obtenemos los datos de la carta seleccionada y el índice del slot.
+        const cardDataFromHand = this.selectedCard.cardData;
+        const fieldIndex = parseInt(dropZone.name.split('-')[1]);
+        const targetCardData = this.player.field[fieldIndex];
+
+        console.log(`Intentando jugar la carta en el slot ${fieldIndex}`);
+
+        // Escenario 1: El slot está vacío. Jugamos la carta normalmente.
+        if (targetCardData === null) {
+            const cardPlayed = this.player.playCardFromHand(cardDataFromHand.instanceId, fieldIndex);
+            if (!cardPlayed) {
+                console.log('El slot ya estaba ocupado (verificación secundaria). La carta volverá a la mano.');
+                return; // No hacemos nada más, dragend la devolverá.
+            }
+
+            // Actualizamos el cardData del objeto visual con los datos del modelo (incluye instanceId)
+            this.selectedCard.cardData = cardPlayed;
+
+            // Detenemos cualquier animación activa en la carta seleccionada
+            if (this.selectedCard.activeTween) {
+                this.selectedCard.activeTween.stop();
+            }
+
+            // Animamos la carta para que se mueva al slot
+            this.tweens.add({
+                targets: this.selectedCard,
+                x: dropZone.x,
+                y: dropZone.y,
+                scale: this.selectedCard.getData('startScale'), // Restauramos su escala original
+                duration: 150,
+                ease: 'Power1',
+            });
+            
+            // Actualizamos las propiedades de la carta para reflejar que está en el campo
+            this.selectedCard.input.cursor = 'pointer'; // Cambiamos el cursor
+            this.selectedCard.setData('isCardOnField', true); // Marcador para identificarla
+            this.selectedCard.setData('fieldIndex', fieldIndex); // Guardamos su índice
+            
+            // --- ¡CORRECCIÓN CLAVE! ---
+            // Actualizamos la posición "original" de la carta para que sea la del slot en el campo.
+            this.selectedCard.setData('startPosition', { x: dropZone.x, y: dropZone.y });
+
+            // La carta jugada ya no es parte de la mano visual
+            this['player-cards'] = this['player-cards'].filter(card => card !== this.selectedCard);
+            this.deselectCard(false); // Deseleccionamos sin animar el retorno
+
+            this.player.drawCard();
+            this.refreshPlayerHand();
+            this.updateDeckCounts();
+
+        // Escenario 2: El slot está OCUPADO.
+        } else {
+            console.log(`Slot ${fieldIndex} ocupado. No se puede jugar la carta aquí. La carta volverá a la mano.`);
+            // No hacemos nada. La bandera 'dropped' sigue en false y el evento 'dragend' la devolverá.
+        }
+    }
+
+    /**
+     * Intenta fusionar dos cartas en el campo de batalla.
+     * @param {Phaser.GameObjects.Image} selectedCardObject La carta que el jugador seleccionó.
+     * @param {Phaser.GameObjects.Image} targetCardObject La carta sobre la que se soltó la primera.
+     */
+    attemptToFuse(selectedCardObject, targetCardObject) {
+        // 1. Obtenemos los datos de las cartas involucradas.
+        const initiatingFusionCardData = selectedCardObject.cardData;
+        const targetCardData = targetCardObject.cardData;
+        const targetIndex = targetCardObject.getData('fieldIndex');
+        const fusionPosition = { x: targetCardObject.x, y: targetCardObject.y };
+
+        // 2. Validación: La carta objetivo debe estar en el campo.
+        if (!targetCardObject.getData('isCardOnField')) 
+            return;
+       
+        console.log(`Intento de fusionar ${initiatingFusionCardData.id} con ${targetCardData.id}`);
+        
+        // --- Validaciones ---
+        const areSameType = initiatingFusionCardData.type === targetCardData.type;
+        const areSameLevel = initiatingFusionCardData.level === targetCardData.level;
+        console.log(initiatingFusionCardData.type, targetCardData.type, initiatingFusionCardData.level, targetCardData.level);
+
+        if (!areSameType || !areSameLevel) {
+            console.log('Fallo de fusión: Las cartas no son compatibles.');
+            this.deselectCard(); // Deseleccionamos la carta activa
+            return;
+        }
+
+        // TODO: Validar que el jugador tiene una acción disponible para fusionar.
+
+        console.log('%cFusión exitosa!', 'color: #00ffaa');
+
+        // --- Ejecutar Fusión ---
+        // 3. Actualizar el modelo de datos.
+        const fusionResult = this.player.fuseCards(selectedCardObject.getData('fieldIndex'), targetIndex);
+        if (!fusionResult) {
+            console.error("Error en el modelo de datos al fusionar.");
+            this.deselectCard();
+            return;
+        }
+
+         // --- ¡AQUÍ ESTÁ LA MEJORA! ---
+        // Para "reiniciar" el slot de destino, lo desactivamos temporalmente.
+        // La nueva carta fusionada, al ser una dropzone, se encargará de capturar
+        // los eventos de 'drop' en esa posición.
+        const targetSlot = this['player_battle_slots'][targetIndex];
+        if (targetSlot) targetSlot.disableInteractive();
+
+        const fusedCardData = fusionResult.newCard;
+        // Reactivamos el slot que el modelo nos dice que se ha vaciado.
+        const originalSlot = this['player_battle_slots'][fusionResult.emptiedIndex];
+        if (originalSlot) originalSlot.setInteractive({ dropZone: true });
+
+       
+
+        // 4. Destruir los objetos visuales.
+        const selectedName = selectedCardObject.name;
+        const targetName = targetCardObject.name;
+        
+        selectedCardObject.destroy();
+        targetCardObject.destroy();
+
+        console.log(`Objetos visuales destruidos:`, [selectedName, targetName]);
+
+        // 5. Crear la nueva carta fusionada.
+        // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
+        // Seguimos el orden correcto: Crear, Configurar, Habilitar.
+        const fusedCardObject = new Card(this, fusionPosition.x, fusionPosition.y, fusedCardData, false); // 1. Crear
+
+        fusedCardObject.setScale(0.95); // 2. Configurar (usamos la misma escala que las cartas en mano)
+        fusedCardObject.setData('isCardOnField', true);
+        fusedCardObject.setData('fieldIndex', targetIndex);
+        // --- ¡CORRECCIÓN! ---
+        // Guardamos la posición y escala inicial para futuras selecciones/deselecciones.
+        fusedCardObject.setData('startPosition', { x: fusionPosition.x, y: fusionPosition.y });
+        fusedCardObject.setData('startScale', fusedCardObject.scale);
+
+        // Hacemos que la nueva carta sea seleccionable para futuras acciones
+        fusedCardObject.on('pointerdown', () => this.onCardClicked(fusedCardObject));
+        this.deselectCard(false); // Deseleccionamos sin animación
+
+        // Animación de aparición
+        this.tweens.add({
+            targets: fusedCardObject,
+            scale: { from: 0.5, to: 0.95 },
+            duration: 300,
+            ease: 'Power2'
         });
 
-        this.input.on('dragstart', (pointer, gameObject) => {
-            this.children.bringToTop(gameObject); // Traer la carta al frente
-            // Guardamos la posición original de la carta
-            gameObject.setData('startPosition', { x: gameObject.x, y: gameObject.y });
-            gameObject.setData('dropped', false); // Bandera para saber si se soltó en una zona válida
+        // TODO: Consumir la acción del jugador por este turno.
+    }
+
+    /**
+     * Intenta fusionar una carta de la mano con una carta en el campo.
+     * @param {Card} handCardObject La carta seleccionada de la mano.
+     * @param {Card} fieldCardObject La carta objetivo en el campo.
+     */
+    attemptToFuseFromHand(handCardObject, fieldCardObject) {
+        const handCardData = handCardObject.cardData;
+        const fieldCardData = fieldCardObject.cardData;
+        const targetIndex = fieldCardObject.getData('fieldIndex');
+
+        console.log(`Intento de fusionar carta de mano ${handCardData.id} con carta en campo ${fieldCardData.id}`);
+
+        // 1. Llamamos al modelo del jugador para que gestione la fusión.
+        const fusionResult = this.player.fuseFromHand(handCardData.instanceId, targetIndex);
+
+        // 2. Si el modelo devuelve null, la fusión no era válida (tipos/niveles no coinciden).
+        if (!fusionResult) {
+            console.log('Fallo de fusión desde la mano: Las cartas no son compatibles.');
+            this.deselectCard(); // Deseleccionamos la carta de la mano.
+            return;
+        }
+
+        console.log('%cFusión desde la mano exitosa!', 'color: #00ffaa');
+
+        // 3. Destruimos los objetos visuales de las cartas originales.
+        const fusionPosition = { x: fieldCardObject.x, y: fieldCardObject.y };
+        handCardObject.destroy();
+        fieldCardObject.destroy();
+
+        // 4. Creamos el nuevo objeto visual para la carta fusionada.
+        const fusedCardObject = new Card(this, fusionPosition.x, fusionPosition.y, fusionResult, false);
+        fusedCardObject.setScale(0.95);
+        fusedCardObject.setData('isCardOnField', true);
+        fusedCardObject.setData('fieldIndex', targetIndex);
+        fusedCardObject.setData('startPosition', { x: fusionPosition.x, y: fusionPosition.y });
+        // --- ¡CORRECCIÓN! ---
+        // Guardamos también la escala inicial, que es necesaria para la animación de selección.
+        fusedCardObject.setData('startScale', fusedCardObject.scale);
+
+        // Hacemos que la nueva carta sea seleccionable.
+        fusedCardObject.on('pointerdown', () => this.onCardClicked(fusedCardObject));
+
+        // 5. Limpiamos la selección y refrescamos la mano.
+        this.deselectCard(false); // Deseleccionamos sin animación.
+
+        // --- ¡NUEVA LÓGICA! ---
+        // Robamos una carta para reponer la que se usó desde la mano.
+        this.player.drawCard();
+        this.refreshPlayerHand(); // Actualizamos la mano para que se reordene.
+        this.updateDeckCounts(); // Actualizamos el contador del mazo.
+        // Animación de aparición para la nueva carta.
+        this.tweens.add({
+            targets: fusedCardObject,
+            scale: { from: 0.5, to: 0.95 },
+            duration: 300,
+            ease: 'Power2'
         });
 
-        this.input.on('drop', (pointer, gameObject, dropZone) => {
-            const cardData = gameObject.getData('cardData');
-            console.log(`Carta ${cardData.id} soltada en zona: ${dropZone.name}`);
+        // TODO: Consumir la acción del jugador por este turno.
+    }
 
-            // Obtenemos el índice del slot del campo de batalla (ej: de 'player_battle_slots-2' extraemos 2)
-            const fieldIndex = parseInt(dropZone.name.split('-')[1]);
+    /**
+     * Gestiona el intento de ataque de una carta del jugador a una del oponente.
+     * @param {Phaser.GameObjects.Image} attackingCardObject El objeto de la carta que ataca.
+     * @param {Phaser.GameObjects.Image} defendingCardObject El objeto de la carta que defiende.
+     */
+    handleAttack(attackingCardObject, defendingCardObject) {
+        const attackerData = attackingCardObject.cardData;
+        const defenderData = defendingCardObject.cardData;
 
-            // --- LÓGICA DE REPONER CARTA ---
-            // 1. Actualizar el modelo de datos del jugador PRIMERO
-            // Usamos el método para mover la carta de la mano al campo
-            const cardPlayed = this.player.playCardFromHand(cardData.id, fieldIndex);
+        console.log(`%c[GameScene] Jugador ataca con ${attackerData.type} a ${defenderData.type}`, "color: #ff69b4");
 
-            // 2. Si la carta se pudo jugar (el slot estaba libre)...
-            if (cardPlayed) {
-                gameObject.setData('dropped', true); // Marcamos que el drop fue exitoso
+        // TODO: Validar que el jugador tiene una acción disponible para atacar.
 
-                // Movemos el objeto visualmente al slot
-                gameObject.x = dropZone.x;
-                gameObject.y = dropZone.y;
-                // ¡AQUÍ ESTÁ LA CORRECCIÓN! Ajustamos la escala de la carta para que encaje en el campo.
-                gameObject.setScale(0.82);
+        // Resolvemos el combate
+        const result = resolveCombat(attackerData, defenderData);
+        console.log('Resultado del combate:', result);
 
-                // La carta en el campo ahora es clickeable para atacar
-                gameObject.setInteractive({ cursor: 'crosshair' });
-
-                // Añadimos el listener para el ataque.
-                gameObject.on('pointerdown', () => this.handleAttack(gameObject));
-
-                // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
-                // Quitamos la carta jugada del array de la mano ANTES de refrescar.
-                this['player-cards'] = this['player-cards'].filter(card => card !== gameObject);
-
-                // 3. Robamos una nueva carta y actualizamos la vista
-                this.player.drawCard();
-                this.refreshPlayerHand();
-                this.updateDeckCounts();
-            } else {
-                // Si no se pudo jugar (ej: slot ocupado), no hacemos nada aquí.
-                // El evento 'dragend' se encargará de devolver la carta a la mano.
-                console.log('El slot ya estaba ocupado. La carta volverá a la mano.');
+        // Animación de ataque
+        this.tweens.add({
+            targets: attackingCardObject,
+            x: defendingCardObject.x,
+            y: defendingCardObject.y,
+            duration: 200,
+            yoyo: true, // La carta vuelve a su posición original
+            ease: 'Power1',
+            onComplete: () => {
+                this.deselectCard(false); // Deseleccionamos la carta atacante sin animación de retorno
+                // Aquí se aplicaría el resultado (destruir cartas, etc.)
+                // Por ahora, solo lo mostramos en consola.
             }
         });
 
-        this.input.on('dragend', (pointer, gameObject) => {
-            // Si la carta no se soltó en una zona válida (o el slot estaba ocupado), la devolvemos a su lugar
-            if (!gameObject.getData('dropped')) {
-                const startPosition = gameObject.getData('startPosition');
-                // Usamos un tween para una animación suave de retorno
-                this.tweens.add({
-                    targets: gameObject,
-                    x: startPosition.x,
-                    y: startPosition.y,
-                    duration: 200, // Duración de la animación en ms
-                    ease: 'Power1'
-                });
-            }
-        });
     }
 
     // Crear fila de slots
@@ -182,7 +389,11 @@ export default class GameScene extends Phaser.Scene {
 
             // Si es un slot del campo de batalla del jugador, lo hacemos una zona de drop
             if (name === 'player_battle_slots') {
-                slot.setInteractive({ dropZone: true });
+                slot.setInteractive();
+                // Le añadimos un listener para cuando se haga clic en él
+                slot.on('pointerdown', () => {
+                    this.onSlotClicked(slot);
+                });
             }
 
             slots.push(slot);
@@ -222,67 +433,131 @@ export default class GameScene extends Phaser.Scene {
 
     // Crear carta del jugador
     createPlayerCard(x, y, cardData) {
-        const texture = `card-${cardData.type}-1`; // Anverso
-        let card = this.add.image(x, y, texture)
-<<<<<<< HEAD
-            .setScale(0.82) // Escala reducida
-=======
-            .setScale(0.95) // Escala reducida
->>>>>>> 20061079201f7946cfd55ed4e4f9326869f67a49
-            .setInteractive({ cursor: 'pointer', draggable: true }); // Hacemos la carta arrastrable
-        card.setData('cardData', cardData); // Guardamos los datos de la carta
+        // ¡AQUÍ ESTÁ EL CAMBIO! Usamos la clase Card.
+        // 1. Creamos la instancia. El constructor de Card ya la añade a la escena y la hace interactiva.
+        const card = new Card(this, x, y, cardData, false);
+        
+        // 2. Configuramos sus propiedades visuales y guardamos su posición/escala original.
+        card.setScale(0.95);
+        card.setData('startPosition', { x, y });
+        card.setData('startScale', card.scale);
 
-        // Habilitamos el drag en el input manager de Phaser
-        this.input.setDraggable(card);
-
-
-        // --- LÓGICA DE ACTIVAR ESENCIAS (ELIMINADA DE AQUÍ) ---
-        // Se ha quitado el listener 'pointerdown' que activaba las esencias incorrectamente.
-        // La nueva lógica se gestiona al soltar la carta en el campo y al atacar.
+        // 3. Añadimos el listener para el evento de clic.
+        card.on('pointerdown', () => this.onCardClicked(card));
 
         return card;
     }
 
     /**
-     * Gestiona el intento de ataque de una carta del jugador.
-     * Aquí se aplica la nueva lógica de activación de esencias.
-     * @param {Phaser.GameObjects.Image} attackingCardObject El objeto de la carta que ataca.
+     * Gestiona toda la lógica cuando se hace clic en una carta.
+     * @param {Card} clickedCard El objeto de la carta que ha sido clicada.
      */
-    handleAttack(attackingCardObject) {
-        const cardData = attackingCardObject.getData('cardData');
-        console.log(`%c[GameScene] Jugador ataca con ${cardData.type} (ID: ${cardData.id})`, "color: #ff69b4");
+    onCardClicked(clickedCard) {
+        // Si no hay ninguna carta seleccionada...
+        if (!this.selectedCard) {
+            this.selectCard(clickedCard);
+            return;
+        }
 
-        // Condición 1: Comprobar si el campo del oponente está vacío.
-        const opponentFieldIsEmpty = this.opponent.field.every(slot => slot === null);
+        // Si hacemos clic en la carta que ya estaba seleccionada...
+        if (this.selectedCard === clickedCard) {
+            this.deselectCard();
+            return;
+        }
 
-        // Condición 2: El jugador realiza un ataque (este método es la prueba de ello).
-        if (opponentFieldIsEmpty) {
-            console.log('%cEl campo del oponente está vacío. ¡Ataque directo!', 'color: #ff69b4');
-            
-            // Si la esencia de ese tipo NO está llena, la llenamos.
-            if (!this.player.essences.has(cardData.type)) {
-                this.player.essences.activate(cardData.type);
-                this.game.events.emit('essence-activated', this.player.id, cardData.type);
-            } else {
-                console.log(`La esencia de ${cardData.type} ya estaba llena. No pasa nada.`);
-            }
-        } else {
-            console.log('El oponente tiene cartas. El combate debería resolverse aquí.');
-            // Aquí iría la lógica futura para seleccionar una carta defensora y llamar a resolveCombat().
+        // Si ya hay una carta seleccionada, y hacemos clic en otra...
+        // Comprobamos si es una acción válida (atacar, fusionar).
+
+        // Lógica de FUSIÓN: carta seleccionada en campo -> otra carta propia en campo
+        if (this.selectedCard.getData('isCardOnField') && clickedCard.getData('isCardOnField')) {
+            this.attemptToFuse(this.selectedCard, clickedCard);
+        }
+        // Lógica de ATAQUE: carta seleccionada en campo -> carta del oponente
+        else if (this.selectedCard.getData('isCardOnField') && clickedCard.getData('isOpponentCard')) {
+            this.handleAttack(this.selectedCard, clickedCard);
+        }
+        // --- ¡NUEVA LÓGICA! ---
+        // Lógica de FUSIÓN DESDE MANO: carta seleccionada en mano -> carta propia en campo
+        else if (!this.selectedCard.getData('isCardOnField') && clickedCard.getData('isCardOnField')) {
+            this.attemptToFuseFromHand(this.selectedCard, clickedCard);
+        }
+        // Si no es una acción válida (ej: carta de mano -> otra carta de mano),
+        // simplemente cambiamos la selección a la nueva carta.
+        else {
+            this.deselectCard();
+            this.selectCard(clickedCard);
         }
     }
+
+    /**
+     * Gestiona el clic en un slot del campo de batalla.
+     * @param {Phaser.GameObjects.Image} clickedSlot El slot que ha sido clicado.
+     */
+    onSlotClicked(clickedSlot) {
+        // Solo hacemos algo si hay una carta seleccionada y no es una carta del campo
+        if (this.selectedCard && !this.selectedCard.getData('isCardOnField')) {
+            this.handlePlayCard(this.selectedCard, clickedSlot);
+        } // Si no hay carta seleccionada, o la carta ya está en el campo, el clic en el tablero se encargará de deseleccionar.
+          // No necesitamos un 'else' aquí, ya que el 'pointerdown' del tablero ya llama a deselectCard().
+    }
+
+    /**
+     * Marca una carta como seleccionada y ejecuta una animación.
+     * @param {Card} cardObject La carta a seleccionar.
+     */
+    selectCard(cardObject) {
+        this.selectedCard = cardObject;
+        console.log('Carta seleccionada:', cardObject.cardData);
+
+        // Animación de "levantar" la carta
+        this.tweens.add({
+            targets: cardObject,
+            y: cardObject.getData('startPosition').y - 50, // La elevamos un poco
+            scale: cardObject.getData('startScale') * 1.1, // La agrandamos
+            duration: 150,
+            ease: 'Power1'
+        });
+    }
+
+    /**
+     * Deselecciona la carta activa y la devuelve a su posición original.
+     * @param {boolean} [animate=true] - Si la animación de retorno debe ejecutarse.
+     */
+    deselectCard(animate = true) {
+        if (!this.selectedCard) return;
+
+        const cardToDeselect = this.selectedCard; // Guardamos la referencia
+        this.selectedCard = null;
+        console.log('Carta deseleccionada.');
+        
+        // --- LÓGICA CORREGIDA ---
+        // Si se debe animar, la carta (esté en la mano o en el campo) vuelve
+        // a su posición original guardada en 'startPosition'.
+        if (animate) {
+            this.tweens.add({
+                targets: cardToDeselect,
+                x: cardToDeselect.getData('startPosition').x,
+                y: cardToDeselect.getData('startPosition').y,
+                scale: cardToDeselect.getData('startScale'),
+                duration: 200,
+                ease: 'Power1'
+            });
+        }
+    }
+
+
 
     /**
      * Destruye las cartas actuales de la mano del jugador y las vuelve a crear.
      * Es útil para cuando la mano cambia (robar, descartar, etc.).
      */
     refreshPlayerHand() {
-        // Destruimos los objetos de juego de las cartas anteriores
+        // 1. Destruimos los objetos visuales de las cartas que quedaban en la mano
         if (this['player-cards']) {
             this['player-cards'].forEach(card => card.destroy());
         }
 
-        // Volvemos a crear las cartas con la mano actualizada
+        // 2. Volvemos a crear la fila de cartas con los datos actualizados del modelo this.player.hand
         this.createCardsRow(this.scale.height * 0.82, 'player-cards', this.player.hand);
         console.log('Mano del jugador refrescada.');
     }
@@ -291,32 +566,55 @@ export default class GameScene extends Phaser.Scene {
     createOpponentCard(x, y, cardData) {
         const texture = 'card-back-opponent'; // Reverso
         let card = this.add.image(x, y, texture)
-            .setScale(0.14) // Escala reducida
-            .setInteractive({ cursor: 'pointer' });
+            .setScale(0.14); // Escala reducida
+        
+        card.setInteractive(); // La hacemos interactiva para poder hacer clic en ella
         card.setData('cardData', cardData); // Guardamos los datos de la carta
+        card.setData('isOpponentCard', true); // Marcador para identificarlas
+        card.on('pointerdown', () => this.onCardClicked(card)); // Le añadimos el listener de clic
         return card;
+    }
+
+    /**
+     * Encuentra el objeto visual de una carta en el campo a partir de su índice.
+     * @param {number} fieldIndex El índice de la carta en el array `player.field`.
+     * @param {Phaser.GameObjects.Sprite} [excludeObject=null] Un objeto a excluir de la búsqueda.
+     * @returns {Phaser.GameObjects.Image|null}
+     */
+    findCardObjectOnField(fieldIndex, excludeObject = null) {
+        // Simplificamos la búsqueda para que sea más directa y fiable.
+        return this.children.list.find(child =>
+            child.getData('isCardOnField') && 
+            child.getData('fieldIndex') === fieldIndex
+        );
     }
 
     // Crear mazo y cementerio
     createDecks() {
         const { width, height } = this.scale;
 
+        // --- ¡NUEVA LÓGICA! ---
+        // Definimos un estilo y un padding para los contadores.
+        const textStyle = { 
+            fontSize: '24px', 
+            color: '#fff', 
+            fontStyle: 'bold',
+            stroke: '#000000', // Contorno negro
+            strokeThickness: 5 // Grosor del contorno
+        };
+        const padding = 5; // Pequeño espacio desde el borde.
+
         // Mazo del jugador
-<<<<<<< HEAD
-        this.add.image(width - 120, height - 290, 'card-back-player').setScale(0.185);
-        this.playerDeckText = this.add.text(width - 120, height - 290, this.player.deck.getCardsCount(), { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+        const playerDeckImage = this.add.image(width - 120, height - 290, 'card-back-player').setScale(0.185);
+        const playerDeckBounds = playerDeckImage.getBounds();
+        this.playerDeckText = this.add.text(playerDeckBounds.left + padding, playerDeckBounds.bottom - padding, this.player.deck.getCardsCount(), textStyle)
+            .setOrigin(0, 1); // Anclaje en la esquina inferior izquierda.
 
         // Mazo del oponente
-        this.add.image(120, 290, 'card-back-opponent').setScale(0.185);
-        this.opponentDeckText = this.add.text(120, 290, this.opponent.deck.getCardsCount(), { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
-=======
-        this.add.image(width - 300, height - 250, 'card-back-player').setScale(0.25);
-        this.playerDeckText = this.add.text(width - 270, height - 140, this.player.deck.getCardsCount(), { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
-
-        // Mazo del oponente
-        this.add.image(300, 240, 'card-back-opponent').setScale(0.25);
-        this.opponentDeckText = this.add.text(270, 140, this.opponent.deck.getCardsCount(), { fontSize: '32px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
->>>>>>> 20061079201f7946cfd55ed4e4f9326869f67a49
+        const opponentDeckImage = this.add.image(120, 290, 'card-back-opponent').setScale(0.185);
+        const opponentDeckBounds = opponentDeckImage.getBounds();
+        this.opponentDeckText = this.add.text(opponentDeckBounds.left + padding, opponentDeckBounds.bottom - padding, this.opponent.deck.getCardsCount(), textStyle)
+            .setOrigin(0, 1); // Anclaje en la esquina inferior izquierda.
     }
 
     // Actualizar contadores de mazos

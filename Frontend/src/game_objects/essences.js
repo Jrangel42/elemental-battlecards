@@ -1,4 +1,4 @@
-import { CardTypes } from './card.js';
+import { CARD_TYPES as CardTypes } from '../helpers/constants.js';
 
 /**
  * Gestiona el estado de las esencias elementales para un jugador.
