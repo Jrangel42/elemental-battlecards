@@ -9,7 +9,7 @@ export default class LoginScene extends Phaser.Scene {
         // Cargamos la imagen de fondo para la pantalla de inicio
         // La ruta es relativa a la carpeta 'public', que se sirve en la raíz del servidor.
         // Por lo tanto, el navegador buscará el archivo en '/assets/images/inicio/inicio.webp'.
-        this.load.image('inicio-bg', '/assets/images/inicio/inicio.webp');
+        this.load.image('inicio-bg', '/assets/images/inicio/inicio.png');
         this.load.image('logo', '/assets/images/logotipo.png');
 
         // --- INICIO DE CÓDIGO DE DEPURACIÓN ---
