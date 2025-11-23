@@ -1,242 +1,226 @@
 import Phaser from "phaser";
 
-export default class HomeScene extends Phaser.Scene {
-    constructor() { super("HomeScene"); this.playerData = null; }
+export default class homeScenes extends Phaser.Scene {
+    constructor() {
+        super("homeScenes");
+        this.playerData = null;
+    }
 
     init(data) {
         this.playerData = data;
-        console.log('HomeScene iniciada con los datos del jugador:', this.playerData);
     }
 
     preload() {
-        // No es necesario precargar las imágenes aquí, ya que el HTML/CSS las cargarán directamente.
-        // Corregido: Sí necesitamos cargar el fondo para que Phaser lo gestione.
-        this.load.image('home-background', '/assets/images/home.png');
-        console.log("%c[HomeScene] Precargando assets...", "color: #9f7bff");
+        this.load.image("home-background", "/assets/images/home.png");
     }
 
     create() {
-        console.log(`%c[HomeScene] ¡Bienvenido, ${this.playerData.username}!`, "color: #9f7bff");
         const { width, height } = this.scale;
 
-        // 1. Añadimos el fondo como una imagen de Phaser (igual que en LoginScene)
-        this.bg = this.add.image(width / 2, height / 2, 'home-background');
+        // BACKGROUND
+        this.bg = this.add.image(width / 2, height / 2, "home-background");
         this.bg.setDisplaySize(width, height);
 
-        /**
-         * Crea el componente de la barra de navegación.
-         * @param {object} playerData - Los datos del jugador para mostrar el nombre.
-         * @returns {string} El HTML del navbar.
-         */
-        const createNavbar = (playerData) => `
+        // UI TEMPLATE
+        const html = `
+        <style>
+            :host { box-sizing: border-box; }
+
+            .wrap {
+                position: absolute;
+                inset: 0;
+                display: flex;
+                flex-direction: column;
+                color: white;
+                font-family: Poppins, Arial;
+                overflow: hidden;
+            }
+
+            /* HEADER */
+            .header {
+                flex: 0 0 auto;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 16px 28px;
+                max-width: 100%;
+            }
+            .logo-box { display: flex; align-items: center; gap: 12px; }
+            .logo { width: 50px; height: 50px; }
+            .user { font-size: 14px; opacity: 0.85; }
+            .btn-exit {
+                background: #b90000;
+                padding: 10px 16px;
+                border-radius: 8px;
+                border: none;
+                cursor: pointer;
+                color: white;
+                font-weight: bold;
+            }
+
+            /* MAIN CONTENT */
+            .main {
+                flex: 1;
+                display: flex;
+                padding: 2.5vh 3vw;
+                gap: 5vw;
+                overflow: hidden;
+                justify-content: center;     /* CENTRAR PANELS */
+                align-items: center;         /* CENTRAR VERTICAL */
+            }
+
+            /* PANEL BASE */
+            .panel {
+                background: rgba(0,0,0,0.45);
+                backdrop-filter: blur(8px);
+                border-radius: 14px;
+                padding: 24px;
+                display: flex;
+                flex-direction: column;
+                flex: 1;                    /* QUE CREZCAN PERO SIN ROMPER */
+                height: auto;               /* FIX OVERFLOW */
+                max-height: 100%;           /* EVITA SCROLL */
+                width: auto;                /* FIX OVERFLOW */
+                max-width: 35%;            /* EVITA SCROLL */
+                box-shadow: 0 0 12px rgba(0,0,0,0.55);
+            }
+
+            /* NUEVO TAMAÑO 60% TOTAL */
+            .play-panel {
+                height: 60%;
+                width: 40%;
+                min-width: 320px;
+                min-height: 300px;   /* <-- NUEVO: fuerza espacio interno */
+                display: flex;
+                flex-direction: column;
+            }
+
+
+            .stats-panel {
+                display: flex;
+                flex-direction: column;
+                height: auto;
+                width: 20%; 
+                min-width: 260px; 
+            }
+
+            h2 { margin: 0;
+            font-size: 28px; }
+            p { margin: 0 0 18px 0; }
+
+            .blank-box {
+                flex: 1;                         /* rellena espacio disponible */
+                background: rgba(255,255,255,0.08);
+                border-radius: 10px;
+                margin-bottom: 20px;
+            }
+
+
+            .stats-grid {
+                display: grid;
+                grid-template-columns: 1fr auto;
+                row-gap: 8px;
+                margin-bottom: 60px;
+                gap: 15px;
+            }
+
+            .actions {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                margin-top: 10px;
+            }
+
+            .btn-primary {
+                padding: 12px;
+                background: #8a00ff;
+                border-radius: 8px;
+                border: none;
+                color: white;
+                cursor: pointer;
+            }
+        </style>
+
+        <div class="wrap">
             <header class="header">
                 <div class="logo-box">
-                    <img src="/assets/images/logo.png" class="logo" alt="Logo">
+                    <img class="logo" src="/assets/images/logo.png">
                     <div>
-                        <h1>Elemental Battlecards</h1>
-                        <span class="user">Jugador: ${playerData.username}</span>
+                        <h1 style="margin:0; font-size:22px;">Elemental Battlecards</h1>
+                        <span class="user">Jugador: ${this.playerData?.username || ""}</span>
                     </div>
                 </div>
                 <button class="btn-exit">Salir</button>
             </header>
-        `;
 
+            <div class="main">
+                <section class="panel play-panel">
+                    <h2 style="margin-bottom:20px">Iniciar Partida</h2>
+                    <p>Haz click en "Jugar Ahora" para comenzar.</p>
+                    <div class="blank-box"></div>
+                    <button class="btn-primary" id="play">Jugar Ahora!</button>
+                </section>
 
-        const sceneHTML = `
-            <style>
-                .home-container {
-                    width: 100%;
-                    height: 100%;
-                    font-family: Poppins, Arial, sans-serif;
-                    color: white;
-                    overflow: hidden; /* Evita barras de scroll dentro del elemento DOM */
-                }
-                .header {
-                   width: 100%; display: flex; justify-content: space-between; padding: 20px 40px; align-items: center; box-sizing: border-box; flex-shrink: 0; 
-                    }   
-                .logo-box { display: flex; align-items: center; gap: 15px; }
-                .logo { width: 60px; height: 60px; }
-                .logo-box h1 { font-size: 24px; margin: 0; }
-                .user { font-size: 14px; opacity: 0.8; }
-                .btn-exit {
-                    background: #b90000; padding: 10px 20px; border-radius: 8px;
-                    border: none; color: white; cursor: pointer; font-weight: bold;
-                }
-                .main-container {
-                    display: flex;
-                    gap: 100px; /* Aumentamos el espacio entre paneles */
-                    padding: 50px 130px; /* Reducimos el padding vertical y horizontal para dar más espacio */
-                    height: calc(100% - 90px); /* Ajusta la altura para el espacio del header */
-                } 
-                .glass {
-                    padding: 30px; border-radius: 12px;
-                    background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(8px);
-                    box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
-                    display: flex; flex-direction: column; /* Para alinear contenido interno */
-                }
-                .panel h2 { margin-top: 0; }
-                .blank-box {
-                    width: 100%; height: 160px; background: rgba(255, 255, 255, 0.08);
-                    border-radius: 8px; margin: 20px 0;
-                }
-                .stats {
-                    display: grid; grid-template-columns: 1fr auto;
-                    gap: 10px; margin-bottom: 25px;
-                }
-                .play-panel {
-                    flex: 9; /* Ocupa el doble de espacio que el panel de estadísticas */
-                }
-                .stats-panel {
-                    flex: 9; /* Ocupa una fracción del espacio */
-                }
-                .actions { display: flex; flex-direction: column; margin-top: auto; } /* Empuja las acciones al final */
-                .btn-primary {
-                    width: 100%; background: #8a00ff; border: none; padding: 12px;
-                    border-radius: 8px; color: white; font-size: 15px; cursor: pointer;
-                    margin-bottom: 10px; transition: 0.2s;
-                }
-                .btn-primary:hover { background: #b24cff; }
-
-                /* --- Estilos del Modal --- */
-                .modal-overlay {
-                    position: fixed; /* Usamos fixed para cubrir toda la ventana del juego */
-                    top: 0; left: 0; width: 100%; height: 100%;
-                    background: rgba(0, 0, 0, 0.7);
-                    display: flex; align-items: center; justify-content: center;
-                    z-index: 1000; /* Asegura que esté por encima de todo */
-                    opacity: 0;
-                    visibility: hidden;
-                    transition: opacity 0.3s, visibility 0.3s;
-                }
-                .modal-overlay.visible {
-                    opacity: 1;
-                    visibility: visible;
-                }
-                .modal-content {
-                    width: 500px;
-                    max-width: 90%;
-                    padding: 30px;
-                    border-radius: 12px;
-                    background: rgba(20, 20, 30, 0.85);
-                    backdrop-filter: blur(10px);
-                    box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
-                    position: relative;
-                }
-                .modal-content h2 { margin-top: 0; color: #8a00ff; }
-                .modal-content p { line-height: 1.6; }
-                .modal-close-btn { position: absolute; top: 15px; right: 15px; background: none; border: none; color: white; font-size: 24px; cursor: pointer; }
-            </style>
-
-            <div class="home-container">
-                ${createNavbar(this.playerData)}
-                <main class="main-container">
-                    <section class="panel glass play-panel">
-                        <h2>Iniciar Partida</h2>
-                        <p>Haz click en "Jugar Ahora" para comenzar.</p>
-                        <div class="blank-box"></div>
-                        <button class="btn-primary" id="play-now-btn">Jugar Ahora!</button>
-                    </section>
-                    <section class="panel glass stats-panel">
-                        <h2>Estadísticas</h2>
-                        <div class="stats">
-                            <span>Partidas jugadas</span><span>0</span>
-                            <span>Partidas ganadas</span><span>0</span>
-                            <span>Logros</span><span>0/50</span>
-                            <span>Tiempo Jugado</span><span>0h 0m</span>
-                        </div>
-                        <h2>Acciones</h2>
-                        <div class="actions">
-                            <button class="btn-primary" id="btn-settings">Configuración</button>
-                            <button class="btn-primary" id="btn-about">Acerca de</button>
-                            <button class="btn-primary" id="btn-mechanics">Mecánicas del juego</button>
-                        </div>
-                    </section>
-                </main>
-
-                <!-- Modal Genérico -->
-                <div id="modal-container" class="modal-overlay">
-                    <div class="modal-content glass">
-                        <button id="modal-close-btn" class="modal-close-btn">&times;</button>
-                        <h2 id="modal-title">Título del Modal</h2>
-                        <p id="modal-text">Contenido del modal...</p>
+                <section class="panel stats-panel">
+                    <h2 style="margin-bottom:20px">Estadísticas</h2>
+                    <div class="stats-grid">
+                        <span>Partidas jugadas</span> <span>0</span>
+                        <span>Partidas ganadas</span> <span>0</span>
+                        <span>Logros</span> <span>0/50</span>
+                        <span>Tiempo Jugado</span> <span>0h 0m</span>
                     </div>
-                </div>
+
+                    <h2>Acciones</h2>
+                    <div class="actions">
+                        <button class="btn-primary">Configuración</button>
+                        <button class="btn-primary">Acerca de</button>
+                        <button class="btn-primary">Mecánicas del juego</button>
+                    </div>
+                </section>
             </div>
-        `;
+        </div>`;
 
-        // 2. Creamos el elemento DOM y lo centramos
-        this.homeElement = this.add.dom(width / 2, height / 2).createFromHTML(sceneHTML);
+        // DOM ELEMENT
+        this.domUI = this.add.dom(0, 0).createFromHTML(html);
+        this.domUI.setOrigin(0);
+        this.domUI.setDepth(9999);
 
-        
+        const node = this.domUI.node;
+        node.style.position = "absolute";
+        node.style.left = 0;
+        node.style.top = 0;
+        node.style.width = width + "px";
+        node.style.height = height + "px";
+        node.style.pointerEvents = "auto";
+
         // --- LÓGICA DE LOS BOTONES ---
+        // EXIT BUTTON
+        node.querySelector(".btn-exit").onclick = () => this.scene.start("LoginScene");
 
-        // Elementos del DOM
-        const homeNode = this.homeElement.node;
-        const modalContainer = homeNode.querySelector('#modal-container');
-        const modalTitle = homeNode.querySelector('#modal-title');
-        const modalText = homeNode.querySelector('#modal-text');
-        const btnCloseModal = homeNode.querySelector('#modal-close-btn');
+        this.scale.on("resize", this.onResize, this);
+        const btnCreateRoom = this.homeElement.node.querySelector('#btn-create-room');
 
-        /**
-         * Muestra el modal con un título y contenido específicos.
-         * @param {string} title - El título a mostrar en el modal.
-         * @param {string} content - El texto a mostrar en el modal.
-         */
-        const showModal = (title, content) => {
-            modalTitle.textContent = title;
-            modalText.innerHTML = content; // Usamos innerHTML para poder añadir <br> si es necesario
-            modalContainer.classList.add('visible');
-        };
-
-        // Función para cerrar el modal
-        const closeModal = () => {
-            modalContainer.classList.remove('visible');
-        };
-
-        // Listeners para los botones de acción
-        homeNode.querySelector('#btn-settings').addEventListener('click', () => {
-            showModal('Configuración', 'Aquí irán las opciones de configuración del juego, como el volumen, los gráficos y los controles.');
-        });
-
-        homeNode.querySelector('#btn-about').addEventListener('click', () => {
-            showModal('Acerca de', 'Elemental Battlecards es un juego de cartas estratégico desarrollado por un equipo apasionado. ¡Gracias por jugar!');
-        });
-
-        homeNode.querySelector('#btn-mechanics').addEventListener('click', () => {
-            showModal('Mecánicas del Juego', 'El objetivo es derrotar a tu oponente usando cartas elementales. Cada carta tiene sus propias fortalezas y debilidades. ¡Construye tu mazo sabiamente!');
-        });
-
-        // Listeners para cerrar el modal
-        btnCloseModal.addEventListener('click', closeModal);
-        modalContainer.addEventListener('click', (event) => { if (event.target === modalContainer) closeModal(); }); // Cierra si se hace clic en el fondo
-
-        const btnExit = this.homeElement.node.querySelector('.btn-exit');
-        btnExit.addEventListener('click', () => {
-            this.scene.stop('LoginScene');
-            this.scene.stop('RegisterScene');
-            this.scene.start("LoginScene");
-        });
-
-        const btnPlay = this.homeElement.node.querySelector('#play-now-btn');
-        btnPlay.addEventListener('click', () => {
-            this.scene.start("GameScene", this.playerData);
+        btnCreateRoom.addEventListener('click', () => {
+            const roomName = this.homeElement.node.querySelector('#room-name').value;
+            const password = this.homeElement.node.querySelector('#room-password').value;
+            console.log(`Creando sala... Nombre: ${roomName}, Contraseña: ${password || 'ninguna'}`);
+            // Aquí iría la lógica para conectar con el servidor y crear la sala.
+            // Por ahora, solo mostraremos un mensaje en consola.
         });
 
         // 3. Añadimos el listener para que la escena sea responsive
         this.scale.on('resize', this.resize, this);
     }
 
-    /**
-     * Se llama cada vez que la ventana cambia de tamaño.
-     * Reajusta el fondo y reposiciona el elemento DOM.
-     */
-    resize(gameSize) {
+    onResize(gameSize) {
         const { width, height } = gameSize;
 
-        // Reajustamos el tamaño del fondo de Phaser
-        this.bg.setDisplaySize(width, height);
+        if (this.bg) this.bg.setDisplaySize(width, height);
 
-        // Reposicionamos el elemento DOM en el nuevo centro
-        this.homeElement.setPosition(width / 2, height / 2);
+        if (this.domUI) {
+            const node = this.domUI.node;
+            node.style.width = width + "px";
+            node.style.height = height + "px";
+        }
     }
 }

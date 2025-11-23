@@ -1,172 +1,186 @@
+// createRoomScene.js
 import Phaser from "phaser";
 
 export default class CreateRoomScene extends Phaser.Scene {
-    constructor() { super("CreateRoomScene"); this.playerData = null; }
+    constructor() {
+        super("CreateRoomScene");
+        this.playerData = null;
+    }
 
     init(data) {
         this.playerData = data;
-        console.log('CreateRoomScene iniciada con los datos del jugador:', this.playerData);
     }
 
     preload() {
-        // No es necesario precargar las imágenes aquí, ya que el HTML/CSS las cargarán directamente.
-        // Corregido: Sí necesitamos cargar el fondo para que Phaser lo gestione.
-        this.load.image('home-background', '/assets/images/home.png');
-        console.log("%c[CreateRoomScene] Precargando assets...", "color: #9f7bff");
+        this.load.image("home-background", "/assets/images/home.png");
     }
 
     create() {
-        console.log(`%c[CreateRoomScene] ¡Bienvenido, ${this.playerData.username}!`, "color: #9f7bff");
         const { width, height } = this.scale;
 
-        // 1. Añadimos el fondo como una imagen de Phaser (igual que en LoginScene)
-        this.bg = this.add.image(width / 2, height / 2, 'home-background');
+        // BACKGROUND
+        this.bg = this.add.image(width / 2, height / 2, "home-background");
         this.bg.setDisplaySize(width, height);
 
-        /**
-         * Crea el componente de la barra de navegación.
-         * @param {object} playerData - Los datos del jugador para mostrar el nombre.
-         * @returns {string} El HTML del navbar.
-         */
-        const createNavbar = (playerData) => `
+        // HTML UI TEMPLATE
+        const html = `
+        <style>
+            :host { box-sizing: border-box; }
+
+            .wrap {
+                position: absolute;
+                inset: 0;
+                display: flex;
+                flex-direction: column;
+                color: white;
+                font-family: Poppins, Arial;
+                overflow: hidden;
+            }
+
+            /* HEADER */
+            .header {
+                flex: 0 0 auto;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 16px 28px;
+                max-width: 100%;
+            }
+            .logo-box { display: flex; align-items: center; gap: 12px; }
+            .logo { width: 50px; height: 50px; }
+            .user { font-size: 14px; opacity: 0.85; }
+            .btn-exit {
+                background: #b90000;
+                padding: 10px 16px;
+                border-radius: 8px;
+                border: none;
+                cursor: pointer;
+                color: white;
+                font-weight: bold;
+            }
+
+            /* MAIN */
+            .main {
+                flex: 1;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 5vw;
+                padding: 2.5vh 3vw;
+            }
+
+            /* REUSED PANEL */
+            .panel {
+                background: rgba(0,0,0,0.45);
+                backdrop-filter: blur(8px);
+                border-radius: 14px;
+                padding: 24px;
+                display: flex;
+                flex-direction: column;
+                width: 35%;
+                max-width: 520px;
+                min-width: 320px;
+                box-shadow: 0 0 12px rgba(0,0,0,0.55);
+            }
+
+            h2 { margin: 0; font-size: 28px; }
+            p { margin: 0 0 18px 0; }
+
+            .input-box {
+                background: rgba(255,255,255,0.08);
+                border-radius: 10px;
+                padding: 12px;
+                margin-bottom: 20px;
+                color: #b26aff;
+                font-size: 22px;
+                text-align: center;
+            }
+
+            .btn-primary {
+                padding: 12px;
+                background: #8a00ff;
+                border-radius: 8px;
+                border: none;
+                color: white;
+                cursor: pointer;
+                margin-top: 10px;
+            }
+        </style>
+
+        <div class="wrap">
             <header class="header">
                 <div class="logo-box">
-                    <img src="/assets/images/logo.png" class="logo" alt="Logo">
+                    <img class="logo" src="/assets/images/logo.png" />
                     <div>
-                        <h1>Elemental Battlecards</h1>
-                        <span class="user">Jugador: ${playerData.username}</span>
+                        <h1 style="margin:0; font-size:22px;">Elemental Battlecards</h1>
+                        <span class="user">Jugador: ${this.playerData?.username || ""}</span>
                     </div>
                 </div>
                 <button class="btn-exit">Salir</button>
             </header>
-        `;
 
+            <div class="main">
 
-        const sceneHTML = `
-            <style>
-                .home-container {
-                    width: 100%;
-                    height: 100%; /* Usa vh para asegurar que ocupe toda la altura de la ventana */
-                    font-family: Poppins, Arial, sans-serif;
-                    color: white;
-                    overflow: hidden; /* Evita barras de scroll dentro del elemento DOM */
-                }
-                .header {
-                   width: 100%; display: flex; justify-content: space-between; padding: 20px 40px; align-items: center; box-sizing: border-box; flex-shrink: 0; 
-                    }   
-                .logo-box { display: flex; align-items: center; gap: 15px; }
-                .logo { width: 60px; height: 60px; }
-                .logo-box h1 { font-size: 24px; margin: 0; }
-                .user { font-size: 14px; opacity: 0.8; }
-                .btn-exit {
-                    background: #b90000; padding: 10px 20px; border-radius: 8px;
-                    border: none; color: white; cursor: pointer; font-weight: bold;
-                }
-                .main-container {
-                    display: flex;
-                    gap: 100px; /* Aumentamos el espacio entre paneles */
-                    padding: 50px 130px; /* Reducimos el padding vertical y horizontal para dar más espacio */
-                    height: calc(100% - 90px); /* Ajusta la altura para el espacio del header */
-                } 
-                .glass {
-                    padding: 30px; border-radius: 12px;
-                    background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(8px);
-                    box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
-                    display: flex; flex-direction: column; /* Para alinear contenido interno */
-                }
-                .panel h2 { margin-top: 0; }
-                .blank-box {
-                    width: 100%; height: 160px; background: rgba(255, 255, 255, 0.08);
-                    border-radius: 8px; margin: 20px 0;
-                }
-                .stats {
-                    display: grid; grid-template-columns: 1fr auto;
-                    gap: 10px; margin-bottom: 25px;
-                }
-                .play-panel {
-                    flex: 9; /* Ocupa el doble de espacio que el panel de estadísticas */
-                }
-                .stats-panel {
-                    flex: 9; /* Ocupa una fracción del espacio */
-                }
-                .actions { display: flex; flex-direction: column; margin-top: auto; } /* Empuja las acciones al final */
-                .btn-primary {
-                    width: 100%; background: #8a00ff; border: none; padding: 12px;
-                    border-radius: 8px; color: white; font-size: 15px; cursor: pointer;
-                    margin-bottom: 10px; transition: 0.2s;
-                }
-                .btn-primary:hover { background: #b24cff; }
-            </style>
+                <!-- LEFT: CREATE ROOM PANEL -->
+                <section class="panel">
+                    <h2 style="margin-bottom:20px">Crear Sala</h2>
+                    <p>Comparte el código con tu amigo para que se una.</p>
 
-            <div class="home-container">
-                ${createNavbar(this.playerData)}
-                <main class="main-container">
-                    <section class="panel glass play-panel">
-                        <h2>Iniciar Partida</h2>
-                        <p>Haz click en "Jugar Ahora" para comenzar.</p>
-                        <div class="blank-box"></div>
-                        <button class="btn-primary" id="play-now-btn">Jugar Ahora!</button>
-                    </section>
-                    <section class="panel glass stats-panel">
-                        <h2>Estadísticas</h2>
-                        <div class="stats">
-                            <span>Partidas jugadas</span><span>0</span>
-                            <span>Partidas ganadas</span><span>0</span>
-                            <span>Logros</span><span>0/50</span>
-                            <span>Tiempo Jugado</span><span>0h 0m</span>
-                        </div>
-                        <h2>Acciones</h2>
-                        <div class="actions">
-                            <button class="btn-primary" id="btn-settings">Configuración</button>
-                            <button class="btn-primary" id="btn-about">Acerca de</button>
-                            <button class="btn-primary" id="btn-mechanics">Mecánicas del juego</button>
-                        </div>
-                    </section>
-                </main>
+                    <div id="room-code" class="input-box">XXX XXX</div>
+
+                    <h3 style="margin-top:10px; margin-bottom:10px">Jugadores en sala: 1/2</h3>
+                    <div class="input-box">${this.playerData?.username || "Tú"} (Anfitrión)</div>
+                    <div class="input-box" style="color:white; opacity:0.6;">Esperando jugador...</div>
+
+                    <button class="btn-primary" id="btn-start">Jugar Ahora!</button>
+                </section>
+
+                <!-- RIGHT: JOIN ROOM PANEL -->
+                <section class="panel">
+                    <h2 style="margin-bottom:20px">Unirse a sala</h2>
+                    <p>Ingresa el código que te compartieron.</p>
+
+                    <input id="input-room-code" class="input-box" placeholder="XXX XXX" style="font-size:20px; color:white;" />
+                    <button class="btn-primary" id="btn-join">Unirse a sala</button>
+                </section>
+
             </div>
-        `;
+        </div>`;
 
-        // 2. Creamos el elemento DOM y lo centramos
-        this.homeElement = this.add.dom(width / 2, height / 2).createFromHTML(sceneHTML);
+        // DOM UI
+        this.domUI = this.add.dom(0, 0).createFromHTML(html);
+        this.domUI.setOrigin(0);
+        this.domUI.setDepth(9999);
 
-        // --- LÓGICA DE LOS BOTONES ---
+        const node = this.domUI.node;
+        node.style.position = "absolute";
+        node.style.left = 0;
+        node.style.top = 0;
+        node.style.width = width + "px";
+        node.style.height = height + "px";
 
-        const btnExit = this.homeElement.node.querySelector('.btn-exit');
-        btnExit.addEventListener('click', () => {
-            this.scene.stop('LoginScene');
-            this.scene.stop('RegisterScene');
-            this.scene.start("LoginScene");
-        });
+        // BUTTONS
+        node.querySelector(".btn-exit").onclick = () => this.scene.start("HomeScene");
+        node.querySelector("#btn-start").onclick = () => this.scene.start("GameScene");
 
-        const btnBack = this.homeElement.node.querySelector('#btn-back');
-        btnBack.addEventListener('click', () => {
-            this.scene.start("HomeScene", this.playerData);
-        });
+        node.querySelector("#btn-join").onclick = () => {
+            const code = node.querySelector("#input-room-code").value;
+            console.log("Intentando unirse a sala:", code);
+        };
 
-        const btnCreateRoom = this.homeElement.node.querySelector('#btn-create-room');
-        btnCreateRoom.addEventListener('click', () => {
-            const roomName = this.homeElement.node.querySelector('#room-name').value;
-            const password = this.homeElement.node.querySelector('#room-password').value;
-            console.log(`Creando sala... Nombre: ${roomName}, Contraseña: ${password || 'ninguna'}`);
-            // Aquí iría la lógica para conectar con el servidor y crear la sala.
-            // Por ahora, solo mostraremos un mensaje en consola.
-        });
-
-        // 3. Añadimos el listener para que la escena sea responsive
-        this.scale.on('resize', this.resize, this);
+        // Responsive
+        this.scale.on("resize", this.onResize, this);
     }
 
-    /**
-     * Se llama cada vez que la ventana cambia de tamaño.
-     * Reajusta el fondo y reposiciona el elemento DOM.
-     */
-    resize(gameSize) {
+    onResize(gameSize) {
         const { width, height } = gameSize;
 
-        // Reajustamos el tamaño del fondo de Phaser
-        this.bg.setDisplaySize(width, height);
+        if (this.bg) this.bg.setDisplaySize(width, height);
 
-        // Reposicionamos el elemento DOM en el nuevo centro
-        this.homeElement.setPosition(width / 2, height / 2);
+        if (this.domUI) {
+            const node = this.domUI.node;
+            node.style.width = width + "px";
+            node.style.height = height + "px";
+        }
     }
 }
