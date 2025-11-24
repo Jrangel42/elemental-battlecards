@@ -1,27 +1,19 @@
 import Phaser from 'phaser';
+// Versión actualizada: envía FormData al Apps Script desde el botón
+const scriptURL = "https://script.google.com/macros/s/AKfycbxYudPQa4QPGn62sIdQhQ7XlgI_WU1-zfupR1cmUn0-SoUaoJpWVV_S8mkTfHjYiln1tQ/exec";
 
-export default class RegisterScene extends Phaser.Scene {
+export default class RegisterSceneUpdated extends Phaser.Scene {
     constructor() {
         super('RegisterScene');
     }
 
     preload() {
-        // Cargamos la imagen de fondo y el logo
         this.load.image('inicio-bg', '/assets/images/inicio/inicio.png');
         this.load.image('logo', '/assets/images/logotipo.png');
-
-        this.load.on('loaderror', (file) => {
-            console.error('Error al cargar el archivo:', file.key, file.url);
-        });
-
-        this.load.on('complete', () => {
-            console.log('¡Archivos de preload de RegisterScene cargados!');
-        });
     }
 
     create() {
         const { width, height } = this.scale;
-
         this.bg = this.add.image(0, 0, 'inicio-bg').setOrigin(0, 0);
         this.bg.displayWidth = width;
         this.bg.displayHeight = height;
@@ -84,62 +76,61 @@ export default class RegisterScene extends Phaser.Scene {
             </style>
             <div class="overlay"></div>
             <form class="form-card">
-                <img src="/assets/images/logotipo.png" alt="Elemental Battlecards" class="logo">
+                <img src="/assets/images/logotipo.png" class="logo">
                 <h2>Crea una cuenta</h2>
-                <p class="subtitle">Únete y empieza una nueva aventura</p>
                 <label>Nombre de usuario</label>
-                <input type="text" name="username" placeholder="Username" required>
+                <input type="text" name="username" required>
                 <label>Email</label>
-                <input type="email" name="email" placeholder="tucorreo@gmail.com" required>
+                <input type="email" name="email" required>
                 <label>Contraseña</label>
-                <input type="password" name="password" placeholder="********" required>
-                <label>Confirmar la contraseña</label>
-                <input type="password" name="passwordConfirm" placeholder="********" required>
+                <input type="password" name="password" required>
+                <label>Confirmar</label>
+                <input type="password" name="passwordConfirm" required>
                 <button type="button" class="btn-primary">Crear cuenta</button>
-                <p class="login-text">
-                    ¿Ya tienes cuenta?
-                    <a href="#" id="login-link">Iniciar sesión</a>
-                </p>
+                <p class="login-text">¿Ya tienes cuenta? <a href="#" id="login-link">Iniciar sesión</a></p>
             </form>
         `;
 
-        this.formElement = this.add.dom(width / 2, height / 2).createFromHTML(formHTML);
+        this.formElement = this.add.dom(width/2, height/2).createFromHTML(formHTML);
 
-        this.scale.on('resize', this.resize, this);
-
-        const createAccountButton = this.formElement.node.querySelector('.btn-primary');
-        createAccountButton.addEventListener('click', () => {
-            const username = this.formElement.getChildByName('username').value;
-            const email = this.formElement.getChildByName('email').value;
+        const btn = this.formElement.node.querySelector('.btn-primary');
+        btn.addEventListener('click', async () => {
+            const username = this.formElement.getChildByName('username').value.trim();
+            const email = this.formElement.getChildByName('email').value.trim();
             const password = this.formElement.getChildByName('password').value;
             const passwordConfirm = this.formElement.getChildByName('passwordConfirm').value;
 
-            if (password !== passwordConfirm) {
-                alert('Las contraseñas no coinciden.');
-                return;
-            }
+            if (password !== passwordConfirm) { alert('Las contraseñas no coinciden.'); return; }
+            if (!username || !email || !password) { alert('Completa todos los campos.'); return; }
 
-            if (username && email && password) {
-                console.log(`Creando cuenta para: ${username} con email: ${email}`);
-                // Aquí iría la lógica para validar con el backend
-                this.scene.start('Preloader');
-            } else {
-                alert('Por favor, completa todos los campos.');
+            btn.disabled = true; btn.textContent = 'Creando...';
+            const form = new FormData();
+            form.append('username', username);
+            form.append('email', email);
+            form.append('password', password);
+
+            try {
+                const res = await fetch(scriptURL, { method: 'POST', body: form });
+                const text = await res.text();
+                let json = null;
+                try { json = JSON.parse(text); } catch(e){}
+                if (res.ok && ((json && json.status==='success') || /success/i.test(text))) {
+                    alert('Registro exitoso');
+                    this.scene.start('LoginScene');
+                    return;
+                }
+                alert('Error al registrar: ' + (json && json.message ? json.message : text));
+            } catch (err) {
+                console.error(err);
+                alert('Error de conexión');
+            } finally {
+                btn.disabled = false; btn.textContent = 'Crear cuenta';
             }
         });
 
-        // Navegación a la escena de Login
         const loginLink = this.formElement.node.querySelector('#login-link');
-        loginLink.addEventListener('click', (event) => {
-            event.preventDefault();
-            this.scene.start('LoginScene');
-        });
+        loginLink.addEventListener('click', (e) => { e.preventDefault(); this.scene.start('LoginScene'); });
     }
 
-    resize(gameSize) {
-        const { width, height } = gameSize;
-        this.bg.displayWidth = width;
-        this.bg.displayHeight = height;
-        this.formElement.setPosition(width / 2, height / 2);
-    }
+    resize(gameSize) { const { width, height } = gameSize; this.bg.displayWidth = width; this.bg.displayHeight = height; this.formElement.setPosition(width/2, height/2); }
 }

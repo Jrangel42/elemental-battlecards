@@ -453,7 +453,9 @@ export default class HomeScenes extends Phaser.Scene {
         // Play button placeholder (puedes conectar lógica real)
         const playBtn = node.querySelector('#play');
         if (playBtn) playBtn.addEventListener('click', () => {
-            console.log("Jugar Ahora pulsado");
+            // Al hacer clic en "Jugar Ahora", llevamos al usuario a la escena de creación de sala.
+            console.log("Transicionando a la escena de creación de sala...");
+            this.scene.start('CreateRoomScene');
         });
 
         // Responsive resize handler
@@ -465,10 +467,12 @@ export default class HomeScenes extends Phaser.Scene {
 
         if (this.bg) this.bg.setDisplaySize(width, height);
 
-        if (this.domUI) {
+        if (this.domUI && this.domUI.node) {
             const node = this.domUI.node;
-            node.style.width = width + "px";
-            node.style.height = height + "px";
+            if (node.style) {
+                node.style.width = width + "px";
+                node.style.height = height + "px";
+            }
         }
     }
 }

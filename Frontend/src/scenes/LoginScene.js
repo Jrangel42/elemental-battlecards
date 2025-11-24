@@ -1,5 +1,8 @@
 import Phaser from 'phaser';
 
+// URL del Apps Script (usa la misma que en RegisterScene)
+const scriptURL = "https://script.google.com/macros/s/AKfycbxYudPQa4QPGn62sIdQhQ7XlgI_WU1-zfupR1cmUn0-SoUaoJpWVV_S8mkTfHjYiln1tQ/exec";
+
 export default class LoginScene extends Phaser.Scene {
     constructor() {
         super('LoginScene');
@@ -150,21 +153,61 @@ export default class LoginScene extends Phaser.Scene {
         // Escuchamos el evento 'resize' del gestor de escalado para hacer la escena responsive
         this.scale.on('resize', this.resize, this);
 
-        // Añadimos un listener al botón
+        // Añadimos un listener al botón para enviar credenciales al Apps Script
         const loginButton = this.formElement.node.querySelector('.btn-primary');
-        loginButton.addEventListener('click', () => {
+        loginButton.addEventListener('click', async () => {
+            const usernameEl = this.formElement.getChildByName('username');
+            const passwordEl = this.formElement.getChildByName('password');
 
-            const username = this.formElement.getChildByName('username').value;
-            const password = this.formElement.getChildByName('password').value;
+            const username = usernameEl ? usernameEl.value.trim() : '';
+            const password = passwordEl ? passwordEl.value : '';
 
-            if (username && password) {
-                console.log(`Iniciando sesión como: ${username}`);
-                // Aquí iría la lógica para validar con el backend
-
-                // Una vez validado, pasamos a la siguiente escena
-                this.scene.start('Preloader');
-            } else {
+            if (!username || !password) {
                 alert('Por favor, introduce usuario y contraseña.');
+                return;
+            }
+
+            // Deshabilitar mientras se procesa
+            loginButton.disabled = true;
+            loginButton.style.opacity = '0.7';
+            loginButton.textContent = 'Entrando...';
+
+            const form = new FormData();
+            form.append('action', 'login');
+            form.append('username', username);
+            form.append('password', password);
+
+            try {
+                const res = await fetch(scriptURL, { method: 'POST', body: form });
+                const text = await res.text();
+                let json = null;
+                try { json = JSON.parse(text); } catch (e) { /* not JSON */ }
+
+                if (res.ok && json && json.status === 'success') {
+                    // Login correcto
+                    console.log('Login successful:', json);
+                    alert('Inicio de sesión correcto. Bienvenido ' + (json.username || username));
+                    // Aquí puedes guardar info en localStorage/session si quieres
+
+                    // Una vez que el login es exitoso, llevamos al usuario al menú principal.
+                    // La PreloaderScene ya debería haberse ejecutado al inicio.
+                    this.scene.start('HomeScenes');
+
+                    return;
+                }
+
+                // Si no ok, mostrar error
+                const message = (json && json.message) ? json.message : text || 'Credenciales incorrectas';
+                alert('Error al iniciar sesión: ' + message);
+                console.warn('Login response:', text);
+
+            } catch (error) {
+                console.error('Network/login error', error);
+                alert('Error de conexión. Revisa la consola.');
+            } finally {
+                loginButton.disabled = false;
+                loginButton.style.opacity = '';
+                loginButton.textContent = 'Entrar';
             }
         });
 

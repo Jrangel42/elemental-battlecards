@@ -109,11 +109,21 @@ export default class UIScene extends Phaser.Scene {
             shadow: { offsetX: 1, offsetY: 1, color: '#000', blur: 2, fill: true }
         };
 
+        // --- Temporizador de Turno ---
+        // Creamos el objeto de texto para el temporizador, inicialmente vacío.
+        this.timerText = this.add.text(width / 2, bottomBarY, '', {
+            ...bottomTextStyle,
+            fontSize: '28px',
+            color: '#ffff00'
+        }).setOrigin(0.5);
+
+        // Los textos de "Ataque obligatorio" y "TURNO" han sido eliminados para dar paso al temporizador.
         this.add.rectangle(width / 2, bottomBarY, 550, 50, 0x000000, 0.7);
 
-        this.add.text(width / 2 - 150, bottomBarY, "Ataque obligatorio: 0/2", bottomTextStyle).setOrigin(0.5);
-        this.add.text(width / 2 + 50, bottomBarY, "TURNO: 7/80", bottomTextStyle).setOrigin(0.5);
-
+        // Reposicionamos el texto del temporizador para que esté por encima del fondo de la barra.
+        this.timerText.setDepth(1);
+        
+        
         // --- Botón Cementerio ---
         const btnGraveyardX = width - 120;
         const btnGraveyardY = bottomBarY;
@@ -132,37 +142,68 @@ export default class UIScene extends Phaser.Scene {
         graveyardContainer.add([graveyardBg, graveyardText]);
         graveyardContainer.setSize(btnGraveyardWidth, btnGraveyardHeight).setInteractive({ cursor: 'pointer' });
 
-        // --- Botón Terminar Turno (NUEVO) ---
-        const btnTurnX = 120; // Posición en la esquina inferior izquierda
+        // --- Botón Iniciar Partida ---
+        const btnStartX = 120; // Posición en la esquina inferior izquierda
+        const btnStartY = bottomBarY;
+        const btnStartWidth = 180;
+        const btnStartHeight = 45;
+
+        const startContainer = this.add.container(btnStartX, btnStartY);
+        const startBg = this.add.graphics();
+        startBg.fillStyle(0x006400, 0.9); // Color verde para la acción de iniciar
+        startBg.fillRoundedRect(-btnStartWidth / 2, -btnStartHeight / 2, btnStartWidth, btnStartHeight, 12);
+        startBg.lineStyle(2, 0x00ff00, 1);
+        startBg.strokeRoundedRect(-btnStartWidth / 2, -btnStartHeight / 2, btnStartWidth, btnStartHeight, 12);
+
+        const startText = this.add.text(0, 0, "Iniciar Partida", bottomTextStyle).setOrigin(0.5);
+
+        startContainer.add([startBg, startText]);
+        startContainer.setSize(btnStartWidth, btnStartHeight).setInteractive({ cursor: 'pointer' });
+
+        // Conectamos el evento para que avise a la GameScene que debe empezar
+        startContainer.on('pointerdown', () => {
+            this.gameScene.events.emit('start-game');
+            startContainer.setVisible(false); // Ocultamos el botón después de usarlo
+        });
+
+        // --- Botón Terminar Turno ---
+        // Lo creamos pero lo dejamos invisible hasta que sea el turno del jugador.
+        const btnTurnX = 120;
         const btnTurnY = bottomBarY;
-        const btnTurnWidth = 180; // Un poco más ancho
+        const btnTurnWidth = 180;
         const btnTurnHeight = 45;
 
-        const turnContainer = this.add.container(btnTurnX, btnTurnY);
+        this.endTurnButton = this.add.container(btnTurnX, btnTurnY);
         const turnBg = this.add.graphics();
-        turnBg.fillStyle(0x0055aa, 0.9); // Color azul para diferenciarlo
+        turnBg.fillStyle(0x0055aa, 0.9); // Color azul
         turnBg.fillRoundedRect(-btnTurnWidth / 2, -btnTurnHeight / 2, btnTurnWidth, btnTurnHeight, 12);
         turnBg.lineStyle(2, 0x66bbff, 1);
         turnBg.strokeRoundedRect(-btnTurnWidth / 2, -btnTurnHeight / 2, btnTurnWidth, btnTurnHeight, 12);
-
         const turnText = this.add.text(0, 0, "Terminar Turno", bottomTextStyle).setOrigin(0.5);
 
-        turnContainer.add([turnBg, turnText]);
-        turnContainer.setSize(btnTurnWidth, btnTurnHeight).setInteractive({ cursor: 'pointer' });
-
-        // Conectamos el evento para que avise a la GameScene
-        turnContainer.on('pointerdown', () => {
-            this.gameScene.events.emit('end-turn');
-        });
+        this.endTurnButton.add([turnBg, turnText]);
+        this.endTurnButton.setSize(btnTurnWidth, btnTurnHeight).setInteractive({ cursor: 'pointer' });
+        this.endTurnButton.on('pointerdown', () => this.gameScene.events.emit('end-player-turn'));
+        this.endTurnButton.setVisible(false); // Oculto por defecto.
 
         // --- LISTENER DE EVENTOS ---
-        // La UIScene escucha un evento global del juego.
-        // GameScene emitirá este evento cuando una esencia deba ser activada.
-        this.game.events.on('essence-activated', this.handleEssenceActivation, this);
+        // Escuchamos eventos de la GameScene para actualizar la UI.
+        this.gameScene.events.on('update-timer', this.updateTimer, this);
+        this.gameScene.events.on('game-over', this.showGameOverModal, this);
+        this.gameScene.events.on('essence-activated', this.handleEssenceActivation, this);
+        this.gameScene.events.on('show-end-turn-button', () => this.endTurnButton.setVisible(true));
+        this.gameScene.events.on('hide-end-turn-button', () => this.endTurnButton.setVisible(false));
 
         // Nos aseguramos de limpiar el listener cuando la escena se destruya
         this.events.on('shutdown', () => {
-            this.game.events.off('essence-activated', this.handleEssenceActivation, this);
+            // Limpiamos todos los listeners para evitar fugas de memoria
+            if (this.gameScene) {
+                this.gameScene.events.off('update-timer', this.updateTimer, this);
+                this.gameScene.events.off('game-over', this.showGameOverModal, this);
+                this.gameScene.events.off('essence-activated', this.handleEssenceActivation, this);
+                this.gameScene.events.off('show-end-turn-button');
+                this.gameScene.events.off('hide-end-turn-button');
+            }
         });
 
         // TODO: El botón "Cementerio" ahora está conectado al evento 'end-turn'.
@@ -216,6 +257,106 @@ export default class UIScene extends Phaser.Scene {
             this.opponentOrbs[type] = oOrb;
         });
     }
+
+    /**
+     * Actualiza el texto del temporizador en la UI.
+     * @param {number} time - El tiempo restante en segundos.
+     */
+    updateTimer(time) {
+        if (time > 0) {
+            this.timerText.setText(`Tiempo: ${time}`);
+        } else {
+            this.timerText.setText(''); // Limpiamos el texto si no hay tiempo
+        }
+    }
+
+    /**
+     * Muestra un modal de fin de partida.
+     * @param {string} winner - Quién ganó la partida ('player' u 'opponent').
+     */
+    showGameOverModal(winner) {
+        const { width, height } = this.scale;
+
+        // 1. Creamos un fondo semitransparente que cubra toda la pantalla
+        const overlay = this.add.graphics({ fillStyle: { color: 0x000000, alpha: 0.7 } });
+        overlay.fillRect(0, 0, width, height);
+        overlay.setDepth(100); // Nos aseguramos que esté por encima de todo
+
+        // 2. Creamos el panel del modal
+        const panelWidth = 500;
+        const panelHeight = 250;
+        const panel = this.add.graphics({ fillStyle: { color: 0x1a001a }, lineStyle: { width: 2, color: 0xc49bff } });
+        panel.fillRoundedRect(width / 2 - panelWidth / 2, height / 2 - panelHeight / 2, panelWidth, panelHeight, 15);
+        panel.strokeRoundedRect(width / 2 - panelWidth / 2, height / 2 - panelHeight / 2, panelWidth, panelHeight, 15);
+        panel.setDepth(101);
+
+        // 3. Añadimos el texto de victoria o derrota
+        const titleText = this.add.text(width / 2, height / 2 - 50, 'Fin de la Partida', { fontSize: '48px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(101);
+        
+        const resultText = (winner === 'player') ? '¡Has Ganado!' : '¡Has Perdido!';
+        const resultColor = (winner === 'player') ? '#28a745' : '#dc3545';
+        const messageText = this.add.text(width / 2, height / 2 + 30, resultText, { fontSize: '40px', color: resultColor, fontStyle: 'bold' }).setOrigin(0.5).setDepth(101);
+
+        // Podríamos añadir un botón para volver al menú principal en el futuro
+        // Botón para volver al menú principal
+        const btnWidth = 200;
+        const btnHeight = 48;
+        const btnX = width / 2;
+        const btnY = height / 2 + 90;
+
+        const backBtnBg = this.add.graphics();
+        backBtnBg.fillStyle(0x303df1, 1);
+        backBtnBg.fillRoundedRect(btnX - btnWidth / 2, btnY - btnHeight / 2, btnWidth, btnHeight, 10);
+        backBtnBg.lineStyle(2, 0xffffff, 0.15);
+        backBtnBg.strokeRoundedRect(btnX - btnWidth / 2, btnY - btnHeight / 2, btnWidth, btnHeight, 10);
+        backBtnBg.setDepth(102);
+
+        const backBtnText = this.add.text(btnX, btnY, 'Ir al inicio', { fontSize: '20px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(103);
+
+        // Hacer clickable el botón
+        const backBtnZone = this.add.zone(btnX, btnY, btnWidth, btnHeight).setOrigin(0.5).setInteractive({ cursor: 'pointer' }).setDepth(104);
+        backBtnZone.on('pointerover', () => backBtnBg.setScale(1.02));
+        backBtnZone.on('pointerout', () => backBtnBg.setScale(1));
+        backBtnZone.on('pointerdown', () => {
+            // Limpiar modal
+            overlay.destroy();
+            panel.destroy();
+            titleText.destroy();
+            messageText.destroy();
+            backBtnBg.destroy();
+            backBtnText.destroy();
+            backBtnZone.destroy();
+
+            // Parar y eliminar la escena de juego si está activa
+            try {
+                if (this.scene.isActive('GameScene')) {
+                    // Emitir evento de limpieza si la GameScene lo necesita
+                    const gs = this.scene.get('GameScene');
+                    if (gs && gs.events) {
+                        gs.events.removeAllListeners && gs.events.removeAllListeners();
+                    }
+                    this.scene.stop('GameScene');
+                    this.scene.remove('GameScene');
+                }
+            } catch (err) {
+                console.warn('Error al limpiar GameScene:', err);
+            }
+
+            // Ir al menú principal (HomeScenes) PRIMERO
+            this.scene.start('HomeScenes');
+
+            // Después de iniciar HomeScenes, limpiamos la UI actual (no eliminar antes, evita romper el manager)
+            try {
+                if (this.scene.isActive('UIScene')) {
+                    this.scene.stop('UIScene');
+                    this.scene.remove('UIScene');
+                }
+            } catch (err) {
+                console.warn('Error al limpiar UIScene:', err);
+            }
+        });
+    }
+
 
     /**
      * Manejador que se ejecuta cuando se recibe el evento 'essence-activated'.

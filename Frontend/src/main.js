@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import LoginScene from './scenes/LoginScene.js';
-import RegisterScene from './scenes/RegisterScene.js';
+import RegisterScene from './scenes/RegisterScene.updated.js';
 import PreloaderScene from './scenes/Preloader.js';
 import GameScene from './scenes/GameScene.js'; 
 import UIScene from './scenes/uiScene.js';  
@@ -17,7 +17,17 @@ const config = {
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
     parent: 'game-container',
-    scene: [GameScene,  CreateRoomScene, LoginScene, PreloaderScene, RegisterScene, UIScene] // Se cargarán en este orden
+    /*
+     * El orden de las escenas es importante. Phaser iniciará la primera escena de este array.
+     * 1. PreloaderScene: Debería ser la primera para cargar los assets iniciales.
+     * 2. LoginScene: La pantalla de inicio de sesión será el punto de entrada para el usuario.
+     * 3. RegisterScene: Escena para el registro de nuevos usuarios.
+     * 4. HomeScenes: El menú principal o lobby después de que el usuario inicie sesión.
+     * 5. CreateRoomScene: Escena para crear una nueva partida.
+     * 6. GameScene: La escena principal del juego donde ocurre la acción.
+     * 7. UIScene: Se ejecuta en paralelo a GameScene para mostrar la interfaz de usuario.
+     */
+    scene: [PreloaderScene, LoginScene, RegisterScene, HomeScenes, CreateRoomScene, GameScene, UIScene]
 };
 
 const game = new Phaser.Game(config);

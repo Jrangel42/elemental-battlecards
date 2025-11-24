@@ -14,18 +14,30 @@ export default class PreloaderScene extends Phaser.Scene {
 
         // --- Carga de Recursos ---
 
-        // Asumimos que las imágenes están en esta ruta. ¡Asegúrate de que coincida con tu estructura!
-        const assetPath = 'assets/images/cards/';
+        // Ruta pública desde donde se sirven los assets (raíz del servidor)
+        // Los archivos reales en disco están en `public/assets/images/cartas/`
+        const assetPath = '/assets/images/cartas/';
 
-        // 1. Cargar la imagen del reverso de la carta
-        this.load.image('card_back', `${assetPath}card_back.png`);
+        // Añadimos listeners de depuración para errores de carga
+        this.load.on('loaderror', (file) => {
+            console.error('Failed to process file:', file.type, '"' + file.key + '"', file.src || file.url || file.key);
+        });
+        this.load.on('complete', () => {
+            console.log('¡Archivos de preload de Preloader cargados!');
+        });
 
-        // 2. Cargar todas las imágenes de las caras de las cartas (6 tipos * 3 niveles)
+        // 1. Cargar la imagen del reverso de la carta (archivo disponible: 'abajo.png')
+        this.load.image('card_back', `${assetPath}abajo.png`);
+
+        // 2. Cargar todas las imágenes de las caras de las cartas
+        // Los archivos en la carpeta siguen el patrón: 'carta <tipo>.png', 'carta <tipo> 2.png', 'carta <tipo> 3.png'
         const types = Object.values(CardTypes);
         for (const type of types) {
             for (let level = 1; level <= 3; level++) {
                 const key = `${type}_${level}`; // Ej: 'fuego_1'
-                const url = `${assetPath}${key}.png`; // Ej: 'assets/images/cards/fuego_1.png'
+                // Levanta el nombre correcto según el nivel
+                const fileName = level === 1 ? `carta ${type}.png` : `carta ${type} ${level}.png`;
+                const url = `${assetPath}${fileName}`; // Ej: '/assets/images/cartas/carta fuego 2.png'
                 this.load.image(key, url);
             }
         }
@@ -40,7 +52,7 @@ export default class PreloaderScene extends Phaser.Scene {
      * este método se ejecuta y lanza la escena principal del juego.
      */
     create() {
-        this.scene.start('GameScene');
+        this.scene.start('LoginScene');
     }
 
     /**
