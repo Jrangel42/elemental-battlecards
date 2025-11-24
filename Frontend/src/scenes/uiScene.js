@@ -132,6 +132,29 @@ export default class UIScene extends Phaser.Scene {
         graveyardContainer.add([graveyardBg, graveyardText]);
         graveyardContainer.setSize(btnGraveyardWidth, btnGraveyardHeight).setInteractive({ cursor: 'pointer' });
 
+        // --- Botón Terminar Turno (NUEVO) ---
+        const btnTurnX = 120; // Posición en la esquina inferior izquierda
+        const btnTurnY = bottomBarY;
+        const btnTurnWidth = 180; // Un poco más ancho
+        const btnTurnHeight = 45;
+
+        const turnContainer = this.add.container(btnTurnX, btnTurnY);
+        const turnBg = this.add.graphics();
+        turnBg.fillStyle(0x0055aa, 0.9); // Color azul para diferenciarlo
+        turnBg.fillRoundedRect(-btnTurnWidth / 2, -btnTurnHeight / 2, btnTurnWidth, btnTurnHeight, 12);
+        turnBg.lineStyle(2, 0x66bbff, 1);
+        turnBg.strokeRoundedRect(-btnTurnWidth / 2, -btnTurnHeight / 2, btnTurnWidth, btnTurnHeight, 12);
+
+        const turnText = this.add.text(0, 0, "Terminar Turno", bottomTextStyle).setOrigin(0.5);
+
+        turnContainer.add([turnBg, turnText]);
+        turnContainer.setSize(btnTurnWidth, btnTurnHeight).setInteractive({ cursor: 'pointer' });
+
+        // Conectamos el evento para que avise a la GameScene
+        turnContainer.on('pointerdown', () => {
+            this.gameScene.events.emit('end-turn');
+        });
+
         // --- LISTENER DE EVENTOS ---
         // La UIScene escucha un evento global del juego.
         // GameScene emitirá este evento cuando una esencia deba ser activada.

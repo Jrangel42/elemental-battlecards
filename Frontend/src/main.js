@@ -17,7 +17,7 @@ const config = {
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
     parent: 'game-container',
-    scene: [HomeScenes, GameScene,  CreateRoomScene, LoginScene, PreloaderScene, RegisterScene, UIScene] // Se cargarán en este orden
+    scene: [GameScene,  CreateRoomScene, LoginScene, PreloaderScene, RegisterScene, UIScene] // Se cargarán en este orden
 };
 
 const game = new Phaser.Game(config);

@@ -112,8 +112,10 @@ export default class GameScene extends Phaser.Scene {
         // --- Lógica de Turnos (Ejemplo) ---
         // Escuchamos el evento 'end-turn' que será emitido desde la UIScene.
         this.events.on('end-turn', () => {
-            console.log('El turno ha terminado en GameScene. Ahora sería el turno del oponente.');
-            // Aquí iría la lógica para que juegue el oponente.
+            console.log('%c[GameScene] Turno del jugador terminado. Inicia el turno del oponente.', 'color: #ff8c00');
+            // Deseleccionamos cualquier carta del jugador antes de que el oponente juegue.
+            this.deselectCard(false);
+            this.startOpponentTurn();
         });
 
     }
@@ -319,7 +321,6 @@ export default class GameScene extends Phaser.Scene {
         // 5. Limpiamos la selección y refrescamos la mano.
         this.deselectCard(false); // Deseleccionamos sin animación.
 
-        // --- ¡NUEVA LÓGICA! ---
         // Robamos una carta para reponer la que se usó desde la mano.
         this.player.drawCard();
         this.refreshPlayerHand(); // Actualizamos la mano para que se reordene.
@@ -336,15 +337,131 @@ export default class GameScene extends Phaser.Scene {
     }
 
     /**
+     * Inicia y ejecuta la lógica del turno del oponente.
+     * Esta es un boot muy simple para fines de prueba.
+     */
+    startOpponentTurn() {
+        console.log('%c[Opponent] Analizando acciones...', 'color: #ff8c00');
+
+        // Usamos un temporizador para simular que el oponente "piensa"
+        this.time.delayedCall(1000, () => {
+            // Decisión 1: Intentar atacar
+            const opponentPlayableCards = this.opponent.field.map((card, index) => ({ card, index }))
+                .filter(item => item.card !== null);
+
+            const playerFieldCards = this.player.field.map((card, index) => ({ card, index }))
+                .filter(item => item.card !== null);
+
+            if (opponentPlayableCards.length > 0 && playerFieldCards.length > 0) {
+                const randomAttacker = Phaser.Math.RND.pick(opponentPlayableCards);
+                const randomDefender = Phaser.Math.RND.pick(playerFieldCards);
+    
+                const attackerCardData = randomAttacker.card;
+                const defenderCardData = randomDefender.card;
+    
+                // Necesitamos encontrar los objetos visuales de las cartas para animarlos.
+                const attackerCardObject = this.children.list.find(child =>
+                    child.getData('isOpponentCard') && child.getData('fieldIndex') === randomAttacker.index
+                );
+                const defenderCardObject = this.children.list.find(child =>
+                    child.getData('isCardOnField') && child.getData('fieldIndex') === randomDefender.index
+                );
+    
+                // Si no encontramos los objetos por alguna razón, abortamos para evitar errores.
+                if (!attackerCardObject || !defenderCardObject) {
+                    console.error("No se encontraron los objetos de las cartas para el ataque del oponente.");
+                    this.endOpponentTurn();
+                    return;
+                }
+    
+                console.log(`%c[Opponent] Decide atacar con ${attackerCardData.id} a ${defenderCardData.id}`, 'color: #ff8c00');
+                
+                // 1. Revelamos la carta del oponente que ataca.
+                this.revealOpponentCard(attackerCardObject);
+    
+                // 2. Resolvemos el combate
+                const result = resolveCombat(attackerCardData, defenderCardData);
+                console.log('[Opponent] Resultado del combate:', result);
+    
+                // 3. Animación de ataque (similar a la del jugador)
+                this.tweens.add({
+                    targets: attackerCardObject,
+                    x: defenderCardObject.x,
+                    y: defenderCardObject.y,
+                    duration: 200,
+                    yoyo: true,
+                    ease: 'Power1',
+                    onComplete: () => {
+                        // 4. Aplicamos el resultado después de la animación
+                        if (result.loser === 'attacker') this.destroyCard(this.opponent, randomAttacker.index);
+                        else if (result.loser === 'defender') this.destroyCard(this.player, randomDefender.index);
+                        this.time.delayedCall(500, () => this.endOpponentTurn());
+                    }
+                });
+                return; // Salimos para que no intente jugar otra carta.
+            }
+
+            // Decisión 2: Si no puede atacar, intentar jugar una carta
+            const availableSlots = this.opponent.field.map((slot, index) => (slot === null ? index : -1)).filter(index => index !== -1);
+
+            if (this.opponent.hand.length > 0 && availableSlots.length > 0) {
+                const cardToPlay = this.opponent.hand[0]; // Juega la primera carta de la mano
+                const targetSlotIndex = Phaser.Math.RND.pick(availableSlots);
+
+                console.log(`%c[Opponent] Decide jugar la carta ${cardToPlay.id} en el slot ${targetSlotIndex}`, 'color: #ff8c00');
+
+                // Actualizamos el modelo de datos del oponente
+                const playedCard = this.opponent.playCardFromHand(cardToPlay.instanceId, targetSlotIndex);
+                
+                if (playedCard) {
+                    // Creamos la representación visual de la carta en el campo del oponente
+                    const targetSlotObject = this['opponent_battle_slots'][targetSlotIndex];
+                    const newCardObject = this.createOpponentCard(targetSlotObject.x, targetSlotObject.y, playedCard, 0.17); // Escala ajustada para el campo
+                    newCardObject.setData('isOpponentCard', true); // Marcador para identificarla en el campo
+                    newCardObject.setData('fieldIndex', targetSlotIndex);
+                    
+                    // Reponemos la mano del oponente (lógica y visual)
+                    this.opponent.drawCard();
+                    this.refreshOpponentHand();
+                    this.updateDeckCounts();
+                }
+
+                this.endOpponentTurn();
+                return;
+            }
+
+            // Decisión 3: Si no puede hacer nada, pasar el turno
+            console.log('%c[Opponent] No puede realizar acciones. Pasa el turno.', 'color: #ff8c00');
+            this.endOpponentTurn();
+        });
+    }
+
+    /**
+     * Finaliza el turno del oponente y devuelve el control al jugador.
+     */
+    endOpponentTurn() {
+        console.log('%c[GameScene] Turno del oponente terminado. Inicia el turno del jugador.', 'color: #00ccff');
+        // Aquí podrías habilitar de nuevo los controles del jugador si los desactivaste.
+        // Por ejemplo, mostrar de nuevo el indicador "Tu Turno" en la UIScene.
+    }
+
+    /**
      * Gestiona el intento de ataque de una carta del jugador a una del oponente.
      * @param {Phaser.GameObjects.Image} attackingCardObject El objeto de la carta que ataca.
      * @param {Phaser.GameObjects.Image} defendingCardObject El objeto de la carta que defiende.
      */
     handleAttack(attackingCardObject, defendingCardObject) {
         const attackerData = attackingCardObject.cardData;
-        const defenderData = defendingCardObject.cardData;
+        // --- ¡CORRECCIÓN! ---
+        // Las cartas del oponente guardan sus datos con setData, por lo que debemos usar getData.
+        const defenderData = defendingCardObject.getData('cardData');
 
         console.log(`%c[GameScene] Jugador ataca con ${attackerData.type} a ${defenderData.type}`, "color: #ff69b4");
+
+        // --- ¡NUEVA LÓGICA DE REVELACIÓN! ---
+        // Antes de cualquier otra cosa, revelamos la carta del oponente.
+        // Esto sucede tanto si la carta es destruida como si no.
+        this.revealOpponentCard(defendingCardObject);
 
         // TODO: Validar que el jugador tiene una acción disponible para atacar.
 
@@ -361,12 +478,65 @@ export default class GameScene extends Phaser.Scene {
             yoyo: true, // La carta vuelve a su posición original
             ease: 'Power1',
             onComplete: () => {
-                this.deselectCard(false); // Deseleccionamos la carta atacante sin animación de retorno
-                // Aquí se aplicaría el resultado (destruir cartas, etc.)
-                // Por ahora, solo lo mostramos en consola.
+                this.deselectCard(false);
+
+                // Después de una breve pausa para que se vea el resultado, aplicamos el daño.
+                this.time.delayedCall(250, () => {
+                    if (result.loser === 'attacker') {
+                        this.destroyCard(this.player, attackingCardObject.getData('fieldIndex'));
+                    } else if (result.loser === 'defender') {
+                        // La carta ya fue revelada, ahora la destruimos.
+                        this.destroyCard(this.opponent, defendingCardObject.getData('fieldIndex'));
+                    }
+                    // Si el resultado es 'none', no se destruye ninguna carta, pero la del oponente
+                    // ya quedó revelada, cumpliendo el primer requisito.
+                });
             }
         });
 
+    }
+
+    /**
+     * Destruye una carta del campo, actualizando el modelo y la vista.
+     * @param {Player} owner El jugador propietario de la carta.
+     * @param {number} fieldIndex El índice de la carta en el campo.
+     */
+    destroyCard(owner, fieldIndex) {
+        const cardData = owner.field[fieldIndex];
+        if (!cardData) return;
+
+        console.log(`%c[GameScene] Destruyendo carta ${cardData.id} del jugador ${owner.id} en el slot ${fieldIndex}`, "color: #ff4444");
+
+        // 1. Encontrar el objeto visual de la carta
+        const cardObject = this.children.list.find(child =>
+            child.getData('fieldIndex') === fieldIndex &&
+            ((owner.id === 'player' && child.getData('isCardOnField')) || (owner.id === 'opponent' && child.getData('isOpponentCard')))
+        );
+
+        if (cardObject) {
+            // Animación de destrucción
+            this.tweens.add({
+                targets: cardObject,
+                alpha: 0,
+                scale: cardObject.scale * 0.8,
+                duration: 250,
+                onComplete: () => cardObject.destroy()
+            });
+        }
+
+        // 2. Añadir la carta al cementerio del propietario
+        owner.addCardDataToGraveyard(cardData);
+
+        // 3. Limpiar el slot en el modelo de datos
+        owner.field[fieldIndex] = null;
+
+        // 4. Si la carta era del jugador, reactivar el slot para que sea 'droppable'
+        if (owner.id === 'player') {
+            const slot = this['player_battle_slots'][fieldIndex];
+            if (slot) {
+                slot.setInteractive(); // Lo reactivamos
+            }
+        }
     }
 
     // Crear fila de slots
@@ -389,7 +559,7 @@ export default class GameScene extends Phaser.Scene {
 
             // Si es un slot del campo de batalla del jugador, lo hacemos una zona de drop
             if (name === 'player_battle_slots') {
-                slot.setInteractive();
+                slot.setInteractive({ dropZone: true }); // CORRECCIÓN: Aseguramos que sea dropzone
                 // Le añadimos un listener para cuando se haga clic en él
                 slot.on('pointerdown', () => {
                     this.onSlotClicked(slot);
@@ -562,17 +732,73 @@ export default class GameScene extends Phaser.Scene {
         console.log('Mano del jugador refrescada.');
     }
 
+    /**
+     * Destruye y vuelve a crear las cartas en la mano del oponente.
+     * Útil para mantener la consistencia visual cuando roba una carta.
+     */
+    refreshOpponentHand() {
+        // 1. Destruimos los objetos visuales existentes
+        if (this['opponent-cards']) {
+            this['opponent-cards'].forEach(card => card.destroy());
+        }
+
+        // 2. Volvemos a crear la fila con los datos actualizados
+        this.createCardsRow(this.scale.height * 0.18, 'opponent-cards', this.opponent.hand);
+    }
+
     // Crear carta del oponente
-    createOpponentCard(x, y, cardData) {
+    createOpponentCard(x, y, cardData, scale = 0.2) { // Por defecto, escala pequeña para la mano
         const texture = 'card-back-opponent'; // Reverso
-        let card = this.add.image(x, y, texture)
-            .setScale(0.14); // Escala reducida
+        let card = this.add.image(x, y, texture).setScale(scale);
         
         card.setInteractive(); // La hacemos interactiva para poder hacer clic en ella
         card.setData('cardData', cardData); // Guardamos los datos de la carta
+        card.setData('startScale', card.scale); // Guardamos la escala inicial
         card.setData('isOpponentCard', true); // Marcador para identificarlas
         card.on('pointerdown', () => this.onCardClicked(card)); // Le añadimos el listener de clic
         return card;
+    }
+
+    /**
+     * Revela una carta del oponente, cambiando su textura y aplicando una animación.
+     * @param {Phaser.GameObjects.Image} cardObject La carta del oponente a revelar.
+     */
+    revealOpponentCard(cardObject) {
+        // Si la carta no existe o ya fue revelada, no hacemos nada.
+        if (!cardObject || cardObject.getData('isRevealed')) {
+            return;
+        }
+
+        const cardData = cardObject.getData('cardData');
+        const textureName = `card-${cardData.type}-${cardData.level}`;
+
+        console.log(`%c[GameScene] Revelando carta del oponente: ${cardData.id}`, "color: #9933ff");
+
+        // Marcamos la carta como revelada para no volver a hacerlo.
+        cardObject.setData('isRevealed', true);
+
+        // Animación de revelación: un rápido encogimiento y expansión para simular un "giro".
+        this.tweens.add({
+            targets: cardObject,
+            scaleX: 0,
+            scaleY: cardObject.scaleY * 1.1, // La hacemos un poco más alta
+            duration: 100,
+            ease: 'Power1',
+            onComplete: () => {
+                cardObject.setTexture(textureName); // Cambiamos la textura justo a la mitad de la animación
+
+                // --- ¡NUEVA LÓGICA DE ESCALA! ---
+                // Definimos la nueva escala para la carta revelada.
+                const revealedScale = 0.85;
+
+                // Animación de vuelta
+                this.tweens.add({
+                    targets: cardObject,
+                    scaleX: revealedScale, // Aplicamos la nueva escala más grande
+                    scaleY: revealedScale,
+                    duration: 100, ease: 'Power1' });
+            }
+        });
     }
 
     /**
