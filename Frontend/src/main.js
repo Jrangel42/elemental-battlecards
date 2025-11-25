@@ -3,7 +3,7 @@ import LoginScene from './scenes/LoginScene.js';
 import RegisterScene from './scenes/RegisterScene.updated.js';
 import PreloaderScene from './scenes/Preloader.js';
 import GameScene from './scenes/GameScene.js'; 
-import UIScene from './scenes/uiScene.js';  
+import UIScene from './scenes/UIScene.js';  
 import HomeScenes from './scenes/homeScenes.js';
 import CreateRoomScene from './scenes/createRoomScene.js';
 
