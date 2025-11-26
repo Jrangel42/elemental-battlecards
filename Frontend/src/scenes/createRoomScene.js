@@ -176,17 +176,39 @@ export default class CreateRoomScene extends Phaser.Scene {
 
         // Responsive
         this.scale.on("resize", this.onResize, this);
+
+        // Cleanup on scene shutdown to avoid resize events after DOM removal
+        this.events.on('shutdown', () => {
+            this.scale.off("resize", this.onResize, this);
+            if (this.domUI && this.domUI.node) {
+                // remove any attached DOM listeners if necessary
+                const node = this.domUI.node;
+                const exitBtn = node.querySelector(".btn-exit");
+                const startBtn = node.querySelector("#btn-start");
+                const joinBtn = node.querySelector("#btn-join");
+                if (exitBtn) exitBtn.removeEventListener('click', () => {});
+                if (startBtn) startBtn.removeEventListener('click', () => {});
+                if (joinBtn) joinBtn.onclick = null;
+                this.domUI.destroy();
+                this.domUI = null;
+            }
+        }, this);
     }
 
     onResize(gameSize) {
+        // Defensive: gameSize may be undefined in some calls
+        if (!gameSize) return;
         const { width, height } = gameSize;
 
         if (this.bg) this.bg.setDisplaySize(width, height);
 
-        if (this.domUI) {
+        // Defensive: ensure domUI and its node are present before touching DOM
+        if (this.domUI && this.domUI.node) {
             const node = this.domUI.node;
-            node.style.width = width + "px";
-            node.style.height = height + "px";
+            if (node.style) {
+                node.style.width = width + "px";
+                node.style.height = height + "px";
+            }
         }
     }
 }
