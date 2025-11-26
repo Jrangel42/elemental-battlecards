@@ -36,7 +36,7 @@ export default class PreloaderScene extends Phaser.Scene {
             for (let level = 1; level <= 3; level++) {
                 const key = `${type}_${level}`; // Ej: 'fuego_1'
                 // Levanta el nombre correcto según el nivel
-                const fileName = level === 1 ? `carta ${type}.png` : `carta ${type} ${level}.png`;
+                const fileName = level === 1 ? `carta ${type}.png` : `carta-${type}-${level}.png`;
                 const url = `${assetPath}${fileName}`; // Ej: '/assets/images/cartas/carta fuego 2.png'
                 this.load.image(key, url);
             }

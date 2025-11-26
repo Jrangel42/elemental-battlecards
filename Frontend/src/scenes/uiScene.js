@@ -349,33 +349,14 @@ export default class UIScene extends Phaser.Scene {
             backBtnText.destroy();
             backBtnZone.destroy();
 
-            // Parar y eliminar la escena de juego si está activa
-            try {
-                if (this.scene.isActive('GameScene')) {
-                    // Emitir evento de limpieza si la GameScene lo necesita
-                    const gs = this.scene.get('GameScene');
-                    if (gs && gs.events) {
-                        gs.events.removeAllListeners && gs.events.removeAllListeners();
-                    }
-                    this.scene.stop('GameScene');
-                    this.scene.remove('GameScene');
-                }
-            } catch (err) {
-                console.warn('Error al limpiar GameScene:', err);
-            }
+            // --- ¡CORRECCIÓN CLAVE! ---
+            // Detenemos las escenas de juego y UI. NO las eliminamos con .remove().
+            // Esto permite que Phaser pueda volver a iniciarlas en una nueva partida.
+            this.scene.stop('GameScene');
+            this.scene.stop('UIScene');
 
             // Ir al menú principal (HomeScenes) PRIMERO
             this.scene.start('HomeScenes');
-
-            // Después de iniciar HomeScenes, limpiamos la UI actual (no eliminar antes, evita romper el manager)
-            try {
-                if (this.scene.isActive('UIScene')) {
-                    this.scene.stop('UIScene');
-                    this.scene.remove('UIScene');
-                }
-            } catch (err) {
-                console.warn('Error al limpiar UIScene:', err);
-            }
         });
     }
 

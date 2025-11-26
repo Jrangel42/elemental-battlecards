@@ -3,7 +3,7 @@ import LoginScene from './scenes/LoginScene.js';
 import RegisterScene from './scenes/RegisterScene.updated.js';
 import PreloaderScene from './scenes/Preloader.js';
 import GameScene from './scenes/GameScene.js'; 
-import UIScene from './scenes/UIScene.js';  
+import UIScene from './scenes/uiScene.js';  
 import HomeScenes from './scenes/homeScenes.js';
 import CreateRoomScene from './scenes/createRoomScene.js';
 
@@ -17,6 +17,11 @@ const config = {
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
     parent: 'game-container',
+    loader: {
+        // --- ¡CORRECCIÓN CLAVE! ---
+        // Generamos mipmaps durante la carga para evitar tirones (stutter) y advertencias de WebGL.
+        generateMipmap: true
+    },
     /*
      * El orden de las escenas es importante. Phaser iniciará la primera escena de este array.
      * 1. PreloaderScene: Debería ser la primera para cargar los assets iniciales.
@@ -27,7 +32,7 @@ const config = {
      * 6. GameScene: La escena principal del juego donde ocurre la acción.
      * 7. UIScene: Se ejecuta en paralelo a GameScene para mostrar la interfaz de usuario.
      */
-    scene: [GameScene, PreloaderScene, LoginScene, RegisterScene, HomeScenes, CreateRoomScene,  UIScene]
-};
+    scene: [PreloaderScene, LoginScene, RegisterScene, HomeScenes, CreateRoomScene, GameScene, UIScene]
+}
 
 const game = new Phaser.Game(config);

@@ -14,9 +14,9 @@ export default class GameScene extends Phaser.Scene {
         super('GameScene');
         this.playerData = null; // Propiedad para guardar los datos del jugador
         this.selectedCard = null; // Propiedad para la carta seleccionada
-        // Escalas reutilizables para mantener consistencia visual
-        this.handScale = 0.95;   // (se mantiene por compatibilidad)
-        this.fieldScale = 0.95;  // (se mantiene por compatibilidad)
+        // --- MODIFICACIÓN ---
+        // Eliminamos las escalas antiguas. Ahora usaremos un tamaño fijo.
+        // El tamaño de las cartas será igual al de los slots.
         // Tamaños visuales fijos para normalizar tamaño real de todas las texturas
         this.cardHandSize = { width: 110, height: 158 }; // tamaño visual en mano
         this.cardFieldSize = { width: 110, height: 158 }; // tamaño visual en campo / fusiones
@@ -145,8 +145,8 @@ export default class GameScene extends Phaser.Scene {
         this.createSlotsRow(height * 0.55 + battleRowYOffset, 'player_battle_slots', 6);   // Fila del jugador
 
         // ---------- ZONA DE MANO DEL JUGADOR (4 espacios) ----------
-        this.createSlotsRow(height * 0.82, 'player-slots');
-        this.createCardsRow(height * 0.819, 'player-cards', this.player.hand);
+        this.createSlotsRow(height * 0.85, 'player-slots');
+        this.createCardsRow(height * 0.85, 'player-cards', this.player.hand);
 
         // ---------- MAZOS ----------
         this.createDecks();
@@ -219,7 +219,6 @@ export default class GameScene extends Phaser.Scene {
                 targets: this.selectedCard,
                 x: dropZone.x,
                 y: dropZone.y,
-                scale: this.selectedCard.getData('startScale'), // Restauramos su escala original
                 duration: 150,
                 ease: 'Power1',
             });
@@ -340,7 +339,6 @@ export default class GameScene extends Phaser.Scene {
         // Seguimos el orden correcto: Crear, Configurar, Habilitar.
         const fusedCardObject = new Card(this, fusionPosition.x, fusionPosition.y, fusedCardData, false);
         fusedCardObject.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
-        fusedCardObject.setData('startScale', 1);
         fusedCardObject.setData('isCardOnField', true);
         fusedCardObject.setData('fieldIndex', targetIndex);
         // --- ¡CORRECCIÓN CLAVE! ---
@@ -350,16 +348,16 @@ export default class GameScene extends Phaser.Scene {
         // Guardamos la posición y escala inicial para futuras selecciones/deselecciones.
         fusedCardObject.setData('isRevealed', true); // Las cartas fusionadas del jugador siempre están reveladas
         fusedCardObject.setData('startPosition', { x: fusionPosition.x, y: fusionPosition.y });
-        fusedCardObject.setData('startScale', fusedCardObject.scale);
 
         // Hacemos que la nueva carta sea seleccionable para futuras acciones
         fusedCardObject.on('pointerdown', () => this.onCardClicked(fusedCardObject));
         this.deselectCard(false); // Deseleccionamos sin animación
 
-        // Animación de aparición
+        // Animación de aparición (fade-in). No cambiamos escala para evitar overflow.
+        fusedCardObject.alpha = 0;
         this.tweens.add({
             targets: fusedCardObject,
-            scale: { from: 0.5, to: 0.95 },
+            alpha: { from: 0, to: 1 },
             duration: 300,
             ease: 'Power2'
         });
@@ -413,7 +411,8 @@ export default class GameScene extends Phaser.Scene {
         // 4. Creamos el nuevo objeto visual para la carta fusionada.
         const fusedCardObject = new Card(this, fusionPosition.x, fusionPosition.y, fusionResult, false);
         // Normalizamos por tamaño real del sprite (independiente de la resolución del asset)
-        fusedCardObject.setDisplaySize(this.cardHandSize.width, this.cardHandSize.height);
+        // La carta resultante va al campo, por lo que debe usar el tamaño de campo.
+        fusedCardObject.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
         fusedCardObject.setData('isCardOnField', true);
         fusedCardObject.setData('fieldIndex', targetIndex);
         // --- ¡CORRECCIÓN CLAVE! ---
@@ -421,10 +420,7 @@ export default class GameScene extends Phaser.Scene {
         fusedCardObject.setData('cardData', fusionResult);
         fusedCardObject.setData('isRevealed', true); // Las cartas fusionadas del jugador siempre están reveladas
         fusedCardObject.setData('startPosition', { x: fusionPosition.x, y: fusionPosition.y });
-        // --- ¡CORRECCIÓN! ---
-        // Guardamos también la escala inicial, que es necesaria para la animación de selección.
-        fusedCardObject.setData('startScale', fusedCardObject.scale);
-
+        
         // Hacemos que la nueva carta sea seleccionable.
         fusedCardObject.on('pointerdown', () => this.onCardClicked(fusedCardObject));
 
@@ -436,9 +432,11 @@ export default class GameScene extends Phaser.Scene {
         this.refreshPlayerHand(); // Actualizamos la mano para que se reordene.
         this.updateDeckCounts(); // Actualizamos el contador del mazo.
         // Animación de aparición para la nueva carta.
+        // Aparecer con fade-in en lugar de cambiar escala.
+        fusedCardObject.alpha = 0;
         this.tweens.add({
             targets: fusedCardObject,
-            scale: { from: 0.5, to: 0.95 },
+            alpha: { from: 0, to: 1 },
             duration: 300,
             ease: 'Power2'
         });
@@ -523,16 +521,13 @@ export default class GameScene extends Phaser.Scene {
                         const fusedObj = new Card(this, slotObj.x, slotObj.y, res.newCard, true);
                         // Asegurar textura frontal y luego normalizar tamaño visual/escala a dimensiones de campo
                         fusedObj.setTexture(`card-${res.newCard.type}-${res.newCard.level}`);
-                        fusedObj.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
-                        fusedObj.setScale(1);
-                        fusedObj.setData('startScale', fusedObj.scale);
+                        fusedObj.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height); // Tamaño unificado
                         fusedObj.setData('isOpponentCard', true);
                         fusedObj.setData('cardData', res.newCard);
                         fusedObj.setData('fieldIndex', targetIndex);
                         fusedObj.setData('isCardOnField', true);
                         fusedObj.setData('isRevealed', true);
                         fusedObj.setData('startPosition', { x: slotObj.x, y: slotObj.y });
-                        fusedObj.setData('startScale', fusedObj.scale);
                         fusedObj.on('pointerdown', () => this.onCardClicked(fusedObj));
 
                         acted = true;
@@ -550,8 +545,6 @@ export default class GameScene extends Phaser.Scene {
                         const fusedObj = new Card(this, slotObj.x, slotObj.y, fused, true);
                         fusedObj.setTexture(`card-${fused.type}-${fused.level}`);
                         fusedObj.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
-                        fusedObj.setScale(1);
-                        fusedObj.setData('startScale', fusedObj.scale);
                         fusedObj.setData('isOpponentCard', true);
                         fusedObj.setData('cardData', fused);
                         fusedObj.setData('fieldIndex', fusionPlan.targetIndex);
@@ -685,8 +678,7 @@ export default class GameScene extends Phaser.Scene {
                     if (played) {
                         const slotObj = this['opponent_battle_slots'][slotIndex];
                         const newCardObj = new Card(this, slotObj.x, slotObj.y, played, true);
-                        newCardObj.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
-                        newCardObj.setData('startScale', 1);
+                        newCardObj.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height); // Tamaño unificado
                         newCardObj.setData('isOpponentCard', true);
                         newCardObj.setData('cardData', played);
                         newCardObj.setData('fieldIndex', slotIndex);
@@ -802,7 +794,8 @@ export default class GameScene extends Phaser.Scene {
         if (cardObject.setTexture && cardData) {
             const textureName = `card-${cardData.type}-${cardData.level}`;
             cardObject.setTexture(textureName);
-            cardObject.setScale(0.95);
+            // Asegurar que la textura frontal pinta exactamente al tamaño del slot
+            cardObject.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
         }
     }
 
@@ -1288,14 +1281,11 @@ export default class GameScene extends Phaser.Scene {
 
     // Crear carta del jugador
     createPlayerCard(x, y, cardData) {
-        const card = new Card(this, x, y, cardData, false);
-        // Normalizamos por tamaño real del sprite (independiente de la resolución del asset)
-        card.setDisplaySize(this.cardHandSize.width, this.cardHandSize.height);
-        card.setData('startScale', 1);
+        const card = new Card(this, x, y, cardData, false); // Crear la carta en su posición final
+        card.setDisplaySize(this.cardHandSize.width, this.cardHandSize.height); // Tamaño unificado
         card.setData('startPosition', { x, y });
         card.setData('isRevealed', false);
         card.setData('isCardOnField', false);
-
         card.on('pointerdown', () => this.onCardClicked(card));
 
         return card;
@@ -1388,11 +1378,14 @@ export default class GameScene extends Phaser.Scene {
         this.selectedCard = cardObject;
         console.log('Carta seleccionada:', cardObject.cardData);
 
-        // Animación de "levantar" la carta
+        // --- MODIFICACIÓN ---
+        // La animación de "levantar" la carta ahora solo la mueve verticalmente.
+        // No cambiaremos su tamaño para mantener la consistencia.
+        const isOnField = !!cardObject.getData('isCardOnField');
+        const yShift = isOnField ? -25 : -50; // Se levanta más si está en la mano
         this.tweens.add({
             targets: cardObject,
-            y: cardObject.getData('startPosition').y - 50, // La elevamos un poco
-            scale: cardObject.getData('startScale') * 1.1, // La agrandamos
+            y: cardObject.getData('startPosition').y + yShift,
             duration: 150,
             ease: 'Power1'
         });
@@ -1417,7 +1410,6 @@ export default class GameScene extends Phaser.Scene {
                 targets: cardToDeselect,
                 x: cardToDeselect.getData('startPosition').x,
                 y: cardToDeselect.getData('startPosition').y,
-                scale: cardToDeselect.getData('startScale'),
                 duration: 200,
                 ease: 'Power1'
             });
@@ -1437,7 +1429,7 @@ export default class GameScene extends Phaser.Scene {
         }
 
         // 2. Volvemos a crear la fila de cartas con los datos actualizados del modelo this.player.hand
-        this.createCardsRow(this.scale.height * 0.82, 'player-cards', this.player.hand);
+        this.createCardsRow(this.scale.height * 0.85, 'player-cards', this.player.hand);
         console.log('Mano del jugador refrescada.');
     }
 
@@ -1459,8 +1451,7 @@ export default class GameScene extends Phaser.Scene {
     createOpponentCard(x, y, cardData) {
         const card = new Card(this, x, y, cardData, true);
         // Normalizamos el tamaño visual del reverso a tamaño de mano (evita que backs nativos grandes se vean enormes)
-        card.setDisplaySize(this.cardHandSize.width, this.cardHandSize.height);
-        card.setData('startScale', 1);
+        card.setDisplaySize(this.cardHandSize.width, this.cardHandSize.height); // Tamaño unificado
         card.setData('isOpponentCard', true);
         card.setData('isRevealed', false); // siempre boca abajo al colocarse en campo
         return card;
@@ -1487,23 +1478,24 @@ export default class GameScene extends Phaser.Scene {
         // Animación de revelación: un rápido encogimiento y expansión para simular un "giro".
         this.tweens.add({
             targets: cardObject,
-            scaleX: 0,
-            scaleY: cardObject.scaleY * 1.1, // La hacemos un poco más alta
+            scaleX: 0, // Encogemos en el eje X hasta 0
+            scaleY: cardObject.scaleY * 1.1, // La hacemos un poco más alta para el efecto
             duration: 100,
             ease: 'Power1',
             onComplete: () => {
                 cardObject.setTexture(textureName); // Cambiamos la textura justo a la mitad de la animación
 
-                // --- ¡NUEVA LÓGICA DE ESCALA! ---
-                // Revelado: la textura frontal debe pintar exactamente con el mismo tamaño visual del campo
-                const revealedScale = 1; // usamos display size → scale=1 tras el reveal
-
-                // reajustamos displaySize directamente (asegura la misma anchura/altura independientemente de la textura)
+                // --- ¡CORRECCIÓN CLAVE! ---
+                // Primero, forzamos el tamaño visual correcto con la nueva textura.
+                // Esto recalcula internamente las escalas necesarias.
                 cardObject.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
+
+                // Luego, animamos la expansión de vuelta a su escala correcta (la que calculó setDisplaySize).
+                // En lugar de animar a '1', animamos al valor de escala que ya tiene el objeto.
                 this.tweens.add({
                     targets: cardObject,
-                    scaleX: 1,
-                    scaleY: 1,
+                    scaleX: cardObject.scaleX, // Restauramos la escala X correcta
+                    scaleY: cardObject.scaleY, // Restauramos la escala Y correcta
                     duration: 100, ease: 'Power1' });
             }
         });
