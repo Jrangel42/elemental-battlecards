@@ -210,47 +210,144 @@ export default class UIScene extends Phaser.Scene {
 
     /**
      * Crea los indicadores visuales (orbes) para las esencias de ambos jugadores.
+     * Ahora organizados en triángulos (uno arriba del otro) y con flechas
+     * dibujadas como línea + punta.
      */
     createEssenceOrbs() {
         const { width, height } = this.scale;
-        const essenceTypes = Object.values(CardTypes);
-        const orbSize = 40; // Reducimos ligeramente el tamaño para que encajen mejor
-        const padding = 10;
-        const columns = 2; // 2 orbes por fila
+        const orbSize = 40; // tamaño base que usamos para el posicionamiento y offsets
+        const radius = 52; // radio del triángulo
+        const paddingY = 60;
 
-        // --- Orbes del Jugador (Abajo a la izquierda en 2 filas) ---
-        const playerGridStartX = 280;
-        const playerGridStartY = height - 235;
+        // Posiciones: Triángulos apilados
+        const playerCenterX = 130;
+        const playerTopY = height - 370;   // fuego-planta-agua (arriba, jugador)
+        const playerBottomY = height - 170; // luz-sombra-espiritu (abajo, jugador)
 
-        // --- Orbes del Oponente (Arriba a la derecha en 2 filas) ---
-        const opponentGridWidth = (orbSize * columns + padding * (columns - 1));
-        const opponentGridStartX = width - opponentGridWidth - 230;
-        const opponentGridStartY = 140; // Bajado un poco para no chocar con la barra superior
+        const opponentCenterX = width - 130;
+        const opponentTopY = 390;   // fuego-planta-agua (arriba, oponente)
+        const opponentBottomY = 190; // luz-sombra-espiritu (abajo, oponente)
 
-        essenceTypes.forEach((type, index) => {
-            const row = Math.floor(index / columns);
-            const col = index % columns;
+        // Limpiamos cualquier grupo anterior (por si se vuelve a crear)
+        if (this.essenceGraphics && this.essenceGraphics.length) {
+            this.essenceGraphics.forEach(g => g.destroy?.());
+        }
+        this.essenceGraphics = [];
 
-            // --- Crear Orbe del Jugador ---
-            const pOrbX = playerGridStartX + col * (orbSize + padding);
-            const pOrbY = playerGridStartY + row * (orbSize + padding);
-            const pOrb = this.add.image(pOrbX, pOrbY, `orb-${type}`)
-                .setScrollFactor(0)
+        // Crear triángulos: fuego>planta>agua y luz>sombra>espiritu
+        this.createEssenceTriangle(playerCenterX, playerTopY, radius, ['fuego', 'planta', 'agua'], 'player', 0xffffff, orbSize);
+        this.createEssenceTriangle(playerCenterX, playerBottomY, radius, ['luz', 'sombra', 'espiritu'], 'player', 0xffffff, orbSize);
+
+        this.createEssenceTriangle(opponentCenterX, opponentTopY, radius, ['fuego', 'planta', 'agua'], 'opponent', 0xffffff, orbSize);
+        this.createEssenceTriangle(opponentCenterX, opponentBottomY, radius, ['luz', 'sombra', 'espiritu'], 'opponent', 0xffffff, orbSize);
+    }
+
+    /**
+     * Crea un triángulo de 3 orbes con flechas (línea + punta).
+     * @param {number} cx - centro X del triángulo
+     * @param {number} cy - centro Y del triángulo
+     * @param {number} r - radio de colocación de orbes
+     * @param {Array<string>} typesArray - ['fuego','planta','agua']
+     * @param {string} ownerId - 'player'|'opponent'
+     * @param {number} arrowColor - color en hex (0xRRGGBB)
+     * @param {number} orbSize - tamaño base para offsets
+     */
+    createEssenceTriangle(cx, cy, r, typesArray, ownerId, arrowColor = 0xff3333, orbSize = 40) {
+        const anglesDeg = [-90, 30, 150]; // top, bottom-right, bottom-left (clockwise)
+        const elements = [];
+
+        // container para flechas (por debajo) y para orbes (encima)
+        const arrowsGraphics = this.add.graphics({ x: 0, y: 0 }).setDepth(5);
+        const orbsContainer = this.add.container(0, 0).setDepth(10);
+        const scaleValue = 0.08; // escala que hemos usado por consistencia al render de UI
+
+        for (let i = 0; i < 3; i++) {
+            const angle = Phaser.Math.DegToRad(anglesDeg[i]);
+            const x = Math.round(cx + r * Math.cos(angle));
+            const y = Math.round(cy + r * Math.sin(angle));
+
+            const assetKey = `orb-${typesArray[i]}`;
+            const sprite = this.add.image(x, y, assetKey)
+                .setInteractive()
                 .setOrigin(0.5)
-                .setScale(0.08)
-                .setTint(0x666666); // Tinte gris para indicar "desactivado"
-            this.playerOrbs[type] = pOrb;
+                .setScale(scaleValue)
+                .setTint(0x666666); // apagado por defecto
+            // Guardamos datos para referencia
+            sprite.setData('type', typesArray[i]);
+            sprite.setData('owner', ownerId);
+            sprite.setData('active', false);
 
-            // --- Crear Orbe del Oponente ---
-            const oOrbX = opponentGridStartX + col * (orbSize + padding);
-            const oOrbY = opponentGridStartY + row * (orbSize + padding);
-            const oOrb = this.add.image(oOrbX, oOrbY, `orb-${type}`)
-                .setScrollFactor(0)
-                .setOrigin(0.5)
-                .setScale(0.08)
-                .setTint(0x666666); // Tinte gris para indicar "desactivado"
-            this.opponentOrbs[type] = oOrb;
-        });
+            elements.push(sprite);
+            orbsContainer.add(sprite);
+
+            // Guardar en map
+            if (ownerId === 'player') this.playerOrbs[typesArray[i]] = sprite;
+            else this.opponentOrbs[typesArray[i]] = sprite;
+        }
+
+        // Dibujar flechas: 0->1, 1->2, 2->0 (clockwise)
+        for (let i = 0; i < 3; i++) {
+            const a = elements[i];
+            const b = elements[(i + 1) % 3];
+
+            // Calculamos offsets en base al displayWidth/Height reales para que la flecha no cubra las esferas
+            const startOffset = (a.displayWidth || orbSize) / 2 + 6;
+            const endOffset = (b.displayWidth || orbSize) / 2 + 6;
+
+            this.drawArrowLine(arrowsGraphics, a.x, a.y, b.x, b.y, arrowColor, 4, 12, startOffset, endOffset);
+        }
+
+        // Guardar para referencia si necesitamos manipular más adelante
+        this.essenceGraphics.push(arrowsGraphics);
+        this.essenceGraphics.push(orbsContainer);
+    }
+
+    /**
+     * Dibuja una flecha (línea + punta) entre dos puntos en Graphics.
+     * @param {Phaser.GameObjects.Graphics} g
+     * @param {number} fromX
+     * @param {number} fromY
+     * @param {number} toX
+     * @param {number} toY
+     * @param {number} color - 0xRRGGBB
+     * @param {number} thickness - grosor de la línea
+     * @param {number} headLen - longitud de la punta de flecha
+     * @param {number} startOffset - separación desde el origen (px)
+     * @param {number} endOffset - separación hasta llegar al destino (px)
+     */
+    drawArrowLine(g, fromX, fromY, toX, toY, color = 0xff3333, thickness = 3, headLen = 12, startOffset = 0, endOffset = 0) {
+        // Dirección y unit vector
+        const angle = Math.atan2(toY - fromY, toX - fromX);
+        const dx = Math.cos(angle), dy = Math.sin(angle);
+
+        const sx = fromX + dx * startOffset;
+        const sy = fromY + dy * startOffset;
+        const tx = toX - dx * endOffset;
+        const ty = toY - dy * endOffset;
+
+        // Línea principal (shaft) sin cubrir las orbes
+        g.lineStyle(thickness, color, 1);
+        g.beginPath();
+        g.moveTo(sx, sy);
+        // la línea termina en la base de la punta:
+        const baseX = tx - dx * headLen;
+        const baseY = ty - dy * headLen;
+        g.lineTo(baseX, baseY);
+        g.strokePath();
+
+        // Triángulo para la punta de flecha
+        const leftX = tx - headLen * Math.cos(angle - Math.PI / 6);
+        const leftY = ty - headLen * Math.sin(angle - Math.PI / 6);
+        const rightX = tx - headLen * Math.cos(angle + Math.PI / 6);
+        const rightY = ty - headLen * Math.sin(angle + Math.PI / 6);
+
+        g.fillStyle(color, 1);
+        g.beginPath();
+        g.moveTo(tx, ty);
+        g.lineTo(leftX, leftY);
+        g.lineTo(rightX, rightY);
+        g.closePath();
+        g.fillPath();
     }
 
     /**
@@ -349,12 +446,17 @@ export default class UIScene extends Phaser.Scene {
         }
 
         if (targetOrb) {
-            // Activamos el orbe quitándole el tinte gris y añadiendo un pequeño tween
+            // Quitamos el tinte gris para indicar activación
             targetOrb.clearTint();
+
+            // Pulsación visual: aumentamos ligeramente la escala y volvemos al valor original
+            const baseScale = targetOrb.scaleX || 0.08;
+            const pulseScale = baseScale * 1.25;
             this.tweens.add({
                 targets: targetOrb,
-                scale: 0.08 ,
-                duration: 200,
+                scaleX: pulseScale,
+                scaleY: pulseScale,
+                duration: 180,
                 yoyo: true,
                 ease: 'Power1'
             });
