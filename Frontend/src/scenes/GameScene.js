@@ -195,8 +195,8 @@ export default class GameScene extends Phaser.Scene {
         this.createSlotsRow(height * 0.55 + battleRowYOffset, 'player_battle_slots', 6);   // Fila del jugador
 
         // ---------- ZONA DE MANO DEL JUGADOR (4 espacios) ----------
-        this.createSlotsRow(height * 0.85, 'player-slots');
-        this.createCardsRow(height * 0.85, 'player-cards', this.player.hand);
+        this.createSlotsRow(height * 0.825, 'player-slots');
+        this.createCardsRow(height * 0.825, 'player-cards', this.player.hand);
 
         // ---------- MAZOS ----------
         this.createDecks();
@@ -286,40 +286,37 @@ export default class GameScene extends Phaser.Scene {
                 y: dropZone.y,
                 duration: 150,
                 ease: 'Power1',
+                onComplete: () => {
+                    // --- ¡CORRECCIÓN CLAVE! ---
+                    // Toda la lógica que ocurre después de jugar la carta se mueve aquí,
+                    // dentro del 'onComplete' de la animación.
+
+                    // 1. Actualizamos las propiedades de la carta para reflejar que está en el campo.
+                    // Ahora es seguro llamar a setInteractive porque la carta no ha sido destruida.
+                    if (!this.selectedCard.input) {
+                        this.selectedCard.setInteractive();
+                    }
+                    this.selectedCard.input.cursor = 'pointer';
+                    this.selectedCard.setData('isCardOnField', true);
+                    this.selectedCard.setData('cardData', cardPlayed);
+                    this.selectedCard.setData('fieldIndex', fieldIndex);
+                    this.selectedCard.setData('isRevealed', false);
+                    this.selectedCard.setData('startPosition', { x: dropZone.x, y: dropZone.y });
+
+                    // 2. La carta jugada ya no es parte de la mano visual.
+                    this['player-cards'] = this['player-cards'].filter(card => card !== this.selectedCard);
+                    this.deselectCard(false); // Deseleccionamos sin animar.
+
+                    // 3. Robamos, refrescamos la mano y actualizamos contadores.
+                    this.player.drawCard();
+                    this.refreshPlayerHand();
+                    this.updateDeckCounts();
+
+                    // 4. Marcamos la acción y terminamos el turno.
+                    this.playerHasActed = true;
+                    this.time.delayedCall(200, () => this.endPlayerTurn());
+                }
             });
-            
-            // Actualizamos las propiedades de la carta para reflejar que está en el campo
-            // Asegurarnos de que el objeto tiene la propiedad `input` (setInteractive)
-            if (this.selectedCard.input) {
-                this.selectedCard.input.cursor = 'pointer'; // Cambiamos el cursor
-            } else if (typeof this.selectedCard.setInteractive === 'function') {
-                // Forzar interactividad si por alguna razón no estaba inicializada
-                this.selectedCard.setInteractive();
-                if (this.selectedCard.input) this.selectedCard.input.cursor = 'pointer';
-            }
-            this.selectedCard.setData('isCardOnField', true); // Marcador para identificarla
-            // --- ¡CORRECCIÓN CLAVE! ---
-            // Guardamos los datos con setData para que la IA pueda leerlos.
-            this.selectedCard.setData('cardData', cardPlayed);
-            this.selectedCard.setData('fieldIndex', fieldIndex); // Guardamos su índice
-            this.selectedCard.setData('isRevealed', false); // Se colocan siempre boca abajo al entrar en campo (regla 8)
-            
-            // --- ¡CORRECCIÓN CLAVE! ---
-            // Actualizamos la posición "original" de la carta para que sea la del slot en el campo.
-            this.selectedCard.setData('startPosition', { x: dropZone.x, y: dropZone.y });
-
-            // La carta jugada ya no es parte de la mano visual
-            this['player-cards'] = this['player-cards'].filter(card => card !== this.selectedCard);
-            this.deselectCard(false); // Deseleccionamos sin animar el retorno
-
-            this.player.drawCard();
-            this.refreshPlayerHand();
-            this.updateDeckCounts();
-
-            this.playerHasActed = true; // El jugador ha realizado una acción
-            // Deseleccionamos automáticamente la carta usada y terminamos el turno.
-            this.deselectCard(false);
-            this.time.delayedCall(200, () => this.endPlayerTurn());
 
         // Escenario 2: El slot está OCUPADO.
         } else {
@@ -376,8 +373,33 @@ export default class GameScene extends Phaser.Scene {
         console.log('%cFusión exitosa!', 'color: #00ffaa');
 
         // --- Ejecutar Fusión ---
+        // 3. Asegurar sincronía entre la vista y el modelo antes de actualizar datos.
+        const selIdx = selectedCardObject.getData('fieldIndex');
+        const tgtIdx = targetIndex;
+
+        const ensureModelAt = (idx, cardObj) => {
+            if (typeof idx !== 'number') return;
+            if (!this.player.field[idx]) {
+                const cd = (cardObj.getData && cardObj.getData('cardData')) || cardObj.cardData;
+                if (cd) {
+                    console.warn('[GameScene] Sincronizando modelo: rellenando player.field[' + idx + '] desde objeto visual', cd);
+                    this.player.field[idx] = cd;
+                }
+            } else {
+                // Si existe modelo pero difiere de la vista, informar
+                const modelCd = this.player.field[idx];
+                const viewCd = (cardObj.getData && cardObj.getData('cardData')) || cardObj.cardData;
+                if (viewCd && modelCd.instanceId && viewCd.instanceId && modelCd.instanceId !== viewCd.instanceId) {
+                    console.warn('[GameScene] Desincronización detectada en slot', idx, 'modelo.instanceId=', modelCd.instanceId, 'vista.instanceId=', viewCd.instanceId);
+                }
+            }
+        };
+
+        ensureModelAt(selIdx, selectedCardObject);
+        ensureModelAt(tgtIdx, targetCardObject);
+
         // 3. Actualizar el modelo de datos.
-        const fusionResult = this.player.fuseCards(selectedCardObject.getData('fieldIndex'), targetIndex);
+        const fusionResult = this.player.fuseCards(selIdx, tgtIdx);
         if (!fusionResult) {
             console.error("Error en el modelo de datos al fusionar.");
             this.deselectCard();
@@ -1206,10 +1228,10 @@ export default class GameScene extends Phaser.Scene {
         let cardObject = null;
         if (instanceId) {
             cardObject = this.children.list.find(child => {
-                const cd = child.getData('cardData') || child.cardData;
+                const cd = (child.getData && child.getData('cardData')) || child.cardData;
                 if (!cd || !cd.instanceId) return false;
                 const ownerMatch = (owner.id === 'player') ? child.getData('isCardOnField') && !child.getData('isOpponentCard') : child.getData('isOpponentCard') && child.getData('isCardOnField');
-                return ownerMatch && cd.instanceId === id;
+                return ownerMatch && cd.instanceId === instanceId;
             });
         }
 
@@ -1221,20 +1243,28 @@ export default class GameScene extends Phaser.Scene {
             );
         }
 
-        // Si no hay modelo, intentar limpiar fallback visual por instanceId e intentar limpiar el modelo si se detecta
+        // Si no hay modelo ni objeto visual, registrar y salir
         if (!cardData && !cardObject) {
             console.warn(`[GameScene] destroyCard fallo: no existe modelo ni visual para owner=${owner.id} slot=${fieldIndex} id=${instanceId}`);
             // intentar buscar visual por índice
-            const fallback = this.children.list.find(child => child.getData('fieldIndex') === fieldIndex);
-            if (fallback && fallback.destroy) fallback.destroy();
+            const fallback = this.children.list.find(child => {
+                try { return child.getData && child.getData('fieldIndex') === fieldIndex; } catch (e) { return false; }
+            });
+            if (fallback && fallback.destroy) {
+                console.log('[GameScene] destroyCard: eliminando visual fallback en índice', fieldIndex);
+                fallback.destroy();
+            }
             // limpiar modelo si había mismatch
-            if (typeof fieldIndex === 'number' && owner.field[fieldIndex]) owner.field[fieldIndex] = null;
+            if (typeof fieldIndex === 'number' && owner.field[fieldIndex]) {
+                console.log('[GameScene] destroyCard: limpiando modelo en slot', fieldIndex);
+                owner.field[fieldIndex] = null;
+            }
             return;
         }
 
         // Si tenemos modelo pero no objeto visual, intentar borrar solo modelo
         if (cardData && !cardObject) {
-            console.warn('[GameScene] destroyCard: objeto visual no encontrado. Actualizando solamente el modelo.');
+            console.warn('[GameScene] destroyCard: objeto visual no encontrado. Actualizando solamente el modelo.', { owner: owner.id, fieldIndex, cardData });
             // llevar carta(s) al cementerio según nivel
             if (cardData.level === 2) {
                 owner.addCardDataToGraveyard({ ...cardData, level: 1, id: `${cardData.type}-l1` });
@@ -1251,12 +1281,14 @@ export default class GameScene extends Phaser.Scene {
 
         // Destrucción visual con animación si existe
         if (cardObject) {
+            console.log('[GameScene] destroyCard: animando destrucción visual', { owner: owner.id, fieldIndex, instanceId: instanceId || (cardObject.getData && cardObject.getData('cardData') && cardObject.getData('cardData').instanceId) });
             this.tweens.add({
                 targets: cardObject,
                 alpha: 0,
-                scale: cardObject.scale * 0.8,
+                scale: (cardObject.scale || 1) * 0.8,
                 duration: 250,
                 onComplete: () => {
+                    console.log('[GameScene] destroyCard: destroy() llamado sobre objeto visual', { name: cardObject.name, fieldIndex });
                     if (cardObject && cardObject.destroy) cardObject.destroy();
                 }
             });
@@ -1270,8 +1302,10 @@ export default class GameScene extends Phaser.Scene {
             } else if (cardData.level === 3) {
                 for (let i = 0; i < 4; i++) owner.addCardDataToGraveyard({ ...cardData, level: 1, id: `${cardData.type}-l1-${i}` });
             } else owner.addCardDataToGraveyard(cardData);
-
-            if (typeof fieldIndex === 'number') owner.field[fieldIndex] = null;
+            if (typeof fieldIndex === 'number') {
+                console.log('[GameScene] destroyCard: limpiando modelo (owner.field) en slot', fieldIndex, 'valor previo:', owner.field[fieldIndex]);
+                owner.field[fieldIndex] = null;
+            }
         }
 
         // Restaurar interactividad del slot si era del jugador
@@ -1508,7 +1542,7 @@ export default class GameScene extends Phaser.Scene {
         }
 
         // 2. Volvemos a crear la fila de cartas con los datos actualizados del modelo this.player.hand
-        this.createCardsRow(this.scale.height * 0.85, 'player-cards', this.player.hand);
+        this.createCardsRow(this.scale.height * 0.83, 'player-cards', this.player.hand);
         console.log('Mano del jugador refrescada.');
     }
 
