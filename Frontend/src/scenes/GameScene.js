@@ -89,12 +89,62 @@ export default class GameScene extends Phaser.Scene {
     }
 
     create() {
+        // Limpieza de objetos visuales de partidas previas (si la escena se reutiliza)
+        try {
+            // Tomamos una copia porque destroy modifica children.list
+            const childrenCopy = this.children ? this.children.list.slice() : [];
+            childrenCopy.forEach(child => {
+                if (!child) return;
+                // Detectar objetos tipo 'Card' por su metadata 'cardData'
+                let hasCardData = false;
+                try { hasCardData = !!(child.getData && child.getData('cardData')); } catch(e) { hasCardData = false; }
+
+                // Detectar slots por nombre (creados con setName(`${name}-${i}`))
+                const name = child.name || '';
+                const isSlot = typeof name === 'string' && (
+                    name.startsWith('player-slots') || name.startsWith('opponent-slots') ||
+                    name.startsWith('player_battle_slots') || name.startsWith('opponent_battle_slots')
+                );
+
+                // Detectar elementos de UI/mazo/tablero por textura keys conocidas
+                let isBoardOrDeck = false;
+                try {
+                    const tex = child.texture && child.texture.key;
+                    if (tex === 'board-bg' || tex === 'slot' || tex === 'card-back-player' || tex === 'card-back-opponent') isBoardOrDeck = true;
+                } catch(e) { isBoardOrDeck = false; }
+
+                if (hasCardData || isSlot || isBoardOrDeck) {
+                    try { if (child.destroy) child.destroy(); } catch (e) { /* ignore */ }
+                }
+            });
+        } catch (e) {
+            console.warn('[GameScene] Error durante limpieza inicial:', e);
+        }
+
+        // Reset / inicialización por si la escena se reutiliza entre partidas
+        this.gameState = 'pre-start';
+        this.playerHasActed = false;
+        this.opponentHasActed = false;
+        this.playerPerformedAttackThisTurn = false;
+        this.opponentPerformedAttackThisTurn = false;
+        this.playerTurnsSinceLastAttack = 0;
+        this.opponentTurnsSinceLastAttack = 0;
+        this.playerMustAttackThisTurn = false;
+        this.opponentMustAttackThisTurn = false;
+        this.playerTurnNumber = 0;
+        this.opponentTurnNumber = 0;
+        this.playerInactiveTurns = 0;
+        this.opponentInactiveTurns = 0;
+
         // Mostramos un mensaje de bienvenida con el nombre del usuario temporal.
-        console.log(`¡Bienvenido a GameScene, ${this.playerData.username}!`);
+        console.log(`¡Bienvenido a GameScene, ${this.playerData?.username || 'Jugador'}!`);
         const { width, height } = this.scale;
         const battleRowYOffset = 70; // Distancia de las filas de batalla al centro
         // Lanza la escena de UI en paralelo para que se muestre por encima.
-        // Le pasamos los datos del jugador también a la UI.
+        // Si ya existe una instancia previa, detenerla primero para evitar duplicados.
+        if (this.scene.isActive('UIScene') || this.scene.isSleeping('UIScene')) {
+            this.scene.stop('UIScene');
+        }
         this.scene.launch('UIScene', { playerData: this.playerData });
 
         // ---------- LÓGICA DE JUGADORES ----------
@@ -162,11 +212,26 @@ export default class GameScene extends Phaser.Scene {
 
         // --- Lógica de Inicio de Partida ---
         // La partida no comienza hasta que la UI nos avise.
+        // Evitar duplicar listeners si create() se llama varias veces.
+        this.events.off('start-game');
         this.events.on('start-game', () => {
             if (this.gameState === 'pre-start') {
                 console.log('%c[GameScene] ¡La partida ha comenzado!', 'color: #28a745; font-size: 16px;');
                 this.startPlayerTurn();
+            } else {
+                console.log('%c[GameScene] start-game ignorado: estado actual = ' + this.gameState, 'color: #bbbbbb');
             }
+        });
+
+        // Cleanup al apagar la escena: evitar listeners y escenas hijas corriendo.
+        this.events.off('shutdown');
+        this.events.on('shutdown', () => {
+            // remover listeners propios
+            this.events.off('start-game');
+            // detener la UIScene si está activa
+            if (this.scene.isActive('UIScene')) this.scene.stop('UIScene');
+            // destruir temporizador si sigue activo
+            if (this.turnTimer) { this.turnTimer.destroy(); this.turnTimer = null; }
         });
 
         // Ya no hay botón "Terminar turno": el turno termina automáticamente
@@ -224,7 +289,14 @@ export default class GameScene extends Phaser.Scene {
             });
             
             // Actualizamos las propiedades de la carta para reflejar que está en el campo
-            this.selectedCard.input.cursor = 'pointer'; // Cambiamos el cursor
+            // Asegurarnos de que el objeto tiene la propiedad `input` (setInteractive)
+            if (this.selectedCard.input) {
+                this.selectedCard.input.cursor = 'pointer'; // Cambiamos el cursor
+            } else if (typeof this.selectedCard.setInteractive === 'function') {
+                // Forzar interactividad si por alguna razón no estaba inicializada
+                this.selectedCard.setInteractive();
+                if (this.selectedCard.input) this.selectedCard.input.cursor = 'pointer';
+            }
             this.selectedCard.setData('isCardOnField', true); // Marcador para identificarla
             // --- ¡CORRECCIÓN CLAVE! ---
             // Guardamos los datos con setData para que la IA pueda leerlos.
@@ -1296,6 +1368,23 @@ export default class GameScene extends Phaser.Scene {
      * @param {Card} clickedCard El objeto de la carta que ha sido clicada.
      */
     onCardClicked(clickedCard) {
+        // Evitar seleccionar cartas del oponente directamente.
+        const clickedIsOpponent = !!clickedCard.getData('isOpponentCard');
+
+        // Si se clicó una carta del oponente:
+        if (clickedIsOpponent) {
+            // Permitir solo que sea objetivo de un ataque si ya hay una carta propia
+            // seleccionada en el campo.
+            if (this.selectedCard && this.selectedCard.getData('isCardOnField') && !this.selectedCard.getData('isOpponentCard') && clickedCard.getData('isCardOnField')) {
+                this.handleAttack(this.selectedCard, clickedCard);
+            } else {
+                // Ignorar clicks que intenten seleccionar una carta enemiga.
+                return;
+            }
+            return;
+        }
+
+        // A partir de aquí, la carta clicada no es del oponente.
         // Si no hay ninguna carta seleccionada...
         if (!this.selectedCard) {
             this.selectCard(clickedCard);
@@ -1309,18 +1398,8 @@ export default class GameScene extends Phaser.Scene {
         }
 
         // FUSIÓN: ambas en campo y propias -> válido
-        if (this.selectedCard.getData('isCardOnField') &&
-            clickedCard.getData('isCardOnField') &&
-            !clickedCard.getData('isOpponentCard')) {
+        if (this.selectedCard.getData('isCardOnField') && clickedCard.getData('isCardOnField') && !clickedCard.getData('isOpponentCard')) {
             this.attemptToFuse(this.selectedCard, clickedCard);
-            return;
-        }
-
-        // ATAQUE: carta propia en campo -> carta enemiga en el campo -> válido
-        if (this.selectedCard.getData('isCardOnField') &&
-            clickedCard.getData('isOpponentCard') &&
-            clickedCard.getData('isCardOnField')) {
-            this.handleAttack(this.selectedCard, clickedCard);
             return;
         }
 

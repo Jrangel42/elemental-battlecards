@@ -103,10 +103,36 @@ export default class Player {
      * @returns {{newCard: object, emptiedIndex: number}|null} Un objeto con la nueva carta y el índice del slot vaciado.
      */
     fuseCards(draggedIndex, targetIndex) {
+        // Validaciones básicas de índices
+        if (typeof draggedIndex !== 'number' || typeof targetIndex !== 'number') {
+            console.warn('[Player.fuseCards] Índices inválidos:', draggedIndex, targetIndex);
+            return null;
+        }
+        if (draggedIndex < 0 || draggedIndex >= this.field.length || targetIndex < 0 || targetIndex >= this.field.length) {
+            console.warn('[Player.fuseCards] Índices fuera de rango:', draggedIndex, targetIndex);
+            return null;
+        }
+
         const card1 = this.field[draggedIndex];
         const card2 = this.field[targetIndex];
 
-        // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
+        // Comprobar que ambos slots contengan cartas (modelo)
+        if (!card1 || !card2) {
+            console.warn('[Player.fuseCards] Uno o ambos slots están vacíos. dragged:', card1, 'target:', card2);
+            return null;
+        }
+
+        // Validaciones de compatibilidad (tipo y nivel)
+        if (card1.type !== card2.type || card1.level !== card2.level) {
+            console.warn('[Player.fuseCards] Cartas no compatibles para fusión:', card1, card2);
+            return null;
+        }
+
+        if (card1.level >= 3) {
+            console.warn('[Player.fuseCards] Intento de fusionar carta de nivel máximo:', card1);
+            return null;
+        }
+
         // Buscamos la definición de la carta de nivel superior en nuestra base de datos.
         const newLevel = card1.level + 1;
         const newCardId = `${card1.type}-${newLevel}`; // Ej: 'sombra-2'

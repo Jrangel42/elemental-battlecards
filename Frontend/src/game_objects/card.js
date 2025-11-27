@@ -38,6 +38,10 @@ export default class Card extends Phaser.GameObjects.Sprite {
         // 2. Hacemos la carta interactiva DESPUÉS de que esté en la escena.
         this.setInteractive();
 
+        // Guardar posición inicial y datos como metadatos para uso de la escena
+        this.setData('startPosition', { x, y });
+        this.setData('cardData', cardData);
+
         // Si la carta no está boca abajo desde el principio (ej. por fusión), la revelamos
         if (!this.isFaceDown) {
             this.reveal();
