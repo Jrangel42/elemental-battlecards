@@ -184,6 +184,10 @@ export default class UIScene extends Phaser.Scene {
                 this.gameScene.events.off('update-timer', this.updateTimer, this);
                 this.gameScene.events.off('game-over', this.showGameOverModal, this);
                 this.gameScene.events.off('essence-activated', this.handleEssenceActivation, this);
+                // --- ¡CORRECCIÓN CLAVE! ---
+                // Nos aseguramos de eliminar también el listener del contador de ataque
+                // para evitar que la UI de una partida anterior reaccione a eventos de una nueva.
+                this.gameScene.events.off('update-attack-counter');
             }
         });
 

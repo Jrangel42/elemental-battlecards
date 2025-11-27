@@ -1033,7 +1033,10 @@ export default class GameScene extends Phaser.Scene {
      */
     update() {
         if (this.gameState === 'player-turn' && this.turnTimer) {
-            const remainingTime = Math.ceil(this.turnTimer.getRemainingSeconds());
+            // --- ¡CORRECCIÓN! ---
+            // Usamos getProgress() para tener un valor de 0 a 1 y lo multiplicamos por el total.
+            // Math.ceil asegura que el último segundo se muestre como '1' en lugar de '0'.
+            const remainingTime = Math.ceil((1 - this.turnTimer.getProgress()) * 12);
             // Emitimos un evento para que la UI actualice el contador
             this.events.emit('update-timer', remainingTime);
         } else if (this.gameState !== 'game-over') {
