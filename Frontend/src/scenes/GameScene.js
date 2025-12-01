@@ -131,7 +131,6 @@ export default class GameScene extends Phaser.Scene {
                 // Añadimos el listener para el ataque.
                 gameObject.on('pointerdown', () => this.handleAttack(gameObject));
 
-                // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
                 // Quitamos la carta jugada del array de la mano ANTES de refrescar.
                 this['player-cards'] = this['player-cards'].filter(card => card !== gameObject);
 
@@ -231,12 +230,7 @@ export default class GameScene extends Phaser.Scene {
 
         // Habilitamos el drag en el input manager de Phaser
         this.input.setDraggable(card);
-
-
-        // --- LÓGICA DE ACTIVAR ESENCIAS (ELIMINADA DE AQUÍ) ---
-        // Se ha quitado el listener 'pointerdown' que activaba las esencias incorrectamente.
-        // La nueva lógica se gestiona al soltar la carta en el campo y al atacar.
-
+        
         return card;
     }
 

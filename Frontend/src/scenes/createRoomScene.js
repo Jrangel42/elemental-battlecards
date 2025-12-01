@@ -116,7 +116,7 @@ export default class CreateRoomScene extends Phaser.Scene {
                         <span class="user">Jugador: ${this.playerData?.username || ""}</span>
                     </div>
                 </div>
-                <button class="btn-exit">Salir</button>
+                <button class="btn-exit">Atrás</button>
             </header>
 
             <div class="main">
@@ -162,7 +162,6 @@ export default class CreateRoomScene extends Phaser.Scene {
         const exitBtn = node.querySelector(".btn-exit");
         const startBtn = node.querySelector("#btn-start");
         if (exitBtn) exitBtn.addEventListener('click', () => {
-            // Use start to ensure the scene is launched/returned to reliably
             this.scene.start("HomeScenes");
         });
         if (startBtn) startBtn.addEventListener('click', () => {
