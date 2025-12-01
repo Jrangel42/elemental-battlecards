@@ -250,7 +250,7 @@ export default class HomeScenes extends Phaser.Scene {
         // --- LÓGICA DE LOS BOTONES ---
         // EXIT BUTTON
         const exitBtn = node.querySelector(".btn-exit");
-        if (exitBtn) exitBtn.onclick = () => this.scene.switch("LoginScene");
+        if (exitBtn) exitBtn.onclick = () => this.scene.start("LoginScene");
 
         // Modal elements and helpers
         const modalOverlay = node.querySelector('#scene-modal');
@@ -296,7 +296,7 @@ export default class HomeScenes extends Phaser.Scene {
         const btnMechanics = node.querySelector('[data-modal="mechanics"]');
 
         if (btnConfig) btnConfig.addEventListener('click', () => {
-            openModal("Configuración", "<p>Aquí va el contenido de configuración (reemplázalo).</p>");
+            openModal("Configuración");
         });
         if (btnAbout) btnAbout.addEventListener('click', () => {
             openModal("Acerca de", `<p>Este proyecto es un juego de cartas estratégico digital inspirado en la Teoría de Conjuntos, donde cada mecánica del sistema corresponde a una operación matemática formal.</p>
@@ -452,10 +452,7 @@ export default class HomeScenes extends Phaser.Scene {
 
         // Play button placeholder (puedes conectar lógica real)
         const playBtn = node.querySelector('#play');
-        if (playBtn) playBtn.addEventListener('click', () => {
-            console.log("Jugar Ahora pulsado");
-        });
-
+        if (playBtn) playBtn.onclick = () => this.scene.start("CreateRoomScene");
         // Responsive resize handler
         this.scale.on("resize", this.onResize, this);
     }

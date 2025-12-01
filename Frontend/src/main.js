@@ -18,12 +18,12 @@ const config = {
     },
     parent: 'game-container',
     scene: [
-
-        CreateRoomScene,
-        GameScene,
-        PreloaderScene,
         LoginScene,
         RegisterScene,
+        HomeScenes,
+        CreateRoomScene,
+        PreloaderScene,
+        GameScene,
         UIScene
     ]
 };

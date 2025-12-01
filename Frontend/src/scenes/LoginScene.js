@@ -162,7 +162,7 @@ export default class LoginScene extends Phaser.Scene {
                 // Aquí iría la lógica para validar con el backend
 
                 // Una vez validado, pasamos a la siguiente escena
-                this.scene.start('Preloader');
+                this.scene.start('HomeScenes');
             } else {
                 alert('Por favor, introduce usuario y contraseña.');
             }
