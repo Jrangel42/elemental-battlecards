@@ -184,24 +184,11 @@ export default class UIScene extends Phaser.Scene {
                 this.gameScene.events.off('update-timer', this.updateTimer, this);
                 this.gameScene.events.off('game-over', this.showGameOverModal, this);
                 this.gameScene.events.off('essence-activated', this.handleEssenceActivation, this);
-                // --- ¡CORRECCIÓN CLAVE! ---
                 // Nos aseguramos de eliminar también el listener del contador de ataque
                 // para evitar que la UI de una partida anterior reaccione a eventos de una nueva.
                 this.gameScene.events.off('update-attack-counter');
             }
         });
-
-        // TODO: El botón "Cementerio" ahora está conectado al evento 'end-turn'.
-        // Deberías cambiar esto para que abra la vista del cementerio.
-        // graveyardContainer.on('pointerdown', () => {
-        //     this.gameScene.events.emit('show-graveyard');
-        // });
-
-
-        // --- QUITAR / NO CREAR BOTON "Terminar Turno" ---
-        // Si ya existía un botón de terminar turno, eliminar su handler o no crearlo.
-        // Ejemplo: (si existía)
-        // if (this.endTurnButton) { this.endTurnButton.destroy(); this.endTurnButton = null; }
 
         // --- CONTADOR VISIBLE DE ATAQUE OBLIGATORIO ---
         // Si UI emite 'end-player-turn' en botones antiguos, asegurarse de eliminar ese listener
@@ -418,7 +405,6 @@ export default class UIScene extends Phaser.Scene {
             backBtnText.destroy();
             backBtnZone.destroy();
 
-            // --- ¡CORRECCIÓN CLAVE! ---
             // Detenemos las escenas de juego y UI. NO las eliminamos con .remove().
             // Esto permite que Phaser pueda volver a iniciarlas en una nueva partida.
             this.scene.stop('GameScene');

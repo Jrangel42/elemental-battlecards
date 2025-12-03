@@ -23,7 +23,6 @@ export default class Card extends Phaser.GameObjects.Sprite {
         this.level = cardData.level;
         this.isFaceDown = isFaceDown;
 
-        // --- ¡AQUÍ ESTÁ LA EXPLICACIÓN! ---
         // Asignamos un nombre al GameObject para facilitar la depuración.
         this.setName(cardData.instanceId); // Ahora el 'name' será el ID único de la carta.
 
@@ -32,7 +31,6 @@ export default class Card extends Phaser.GameObjects.Sprite {
         this.attackCooldown = 0; // Turnos que debe esperar para atacar
         this.consecutiveAttacks = 0; // Para la regla del nivel 2
 
-        // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
         // 1. Añadimos la carta a la escena PRIMERO.
         scene.add.existing(this);
         // 2. Hacemos la carta interactiva DESPUÉS de que esté en la escena.

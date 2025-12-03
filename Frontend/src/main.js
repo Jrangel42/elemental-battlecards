@@ -18,7 +18,6 @@ const config = {
     },
     parent: 'game-container',
     loader: {
-        // --- ¡CORRECCIÓN CLAVE! ---
         // Generamos mipmaps durante la carga para evitar tirones (stutter) y advertencias de WebGL.
         generateMipmap: true
     },

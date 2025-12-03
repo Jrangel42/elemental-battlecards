@@ -18,7 +18,6 @@ export default class GameScene extends Phaser.Scene {
         this.roomCode = null;
         this.vsBot = false;
         this.selectedCard = null; // Propiedad para la carta seleccionada
-        // --- MODIFICACIÓN ---
         // Eliminamos las escalas antiguas. Ahora usaremos un tamaño fijo.
         // El tamaño de las cartas será igual al de los slots.
         // Tamaños visuales fijos para normalizar tamaño real de todas las texturas
@@ -28,7 +27,7 @@ export default class GameScene extends Phaser.Scene {
         this.gameState = 'pre-start'; // 'pre-start', 'player-turn', 'opponent-turn', 'game-over'
         this.turnTimer = null; // Referencia al temporizador del turno
 
-        // --- NUEVO: Control de acciones / ataques obligatorios / turnos ---
+        // Control de acciones / ataques obligatorios / turnos ---
         this.playerHasActed = false; // Flag para controlar si ya realizó su 1 acción
         this.opponentHasActed = false;
         this.playerPerformedAttackThisTurn = false; // Si el jugador atacó en el turno
@@ -42,7 +41,7 @@ export default class GameScene extends Phaser.Scene {
         this.playerTurnNumber = 0;
         this.opponentTurnNumber = 0;
 
-        // Contadores de inactividad (ya existían)
+        // Contadores de inactividad
         this.playerInactiveTurns = 0; // Contador de turnos inactivos del jugador
         this.opponentInactiveTurns = 0; // Contador de turnos inactivos del oponente
     }
@@ -174,8 +173,6 @@ export default class GameScene extends Phaser.Scene {
         this.player.essences = new Set();
         this.opponent.essences = new Set();
 
-
-        // --- ¡CORRECCIÓN! ---
         // Añadimos la función 'fillEssence' a las instancias de Player, ya que no está en la clase base.
         const addFillEssence = (playerInstance) => {
             playerInstance.fillEssence = function(essenceType) {
@@ -202,7 +199,7 @@ export default class GameScene extends Phaser.Scene {
             .setOrigin(0.5)
             .setDisplaySize(width, height);
 
-        // ¡AQUÍ ESTÁ LA CORRECCIÓN! Enviamos el tablero al fondo de la lista de renderizado.
+        // Enviamos el tablero al fondo de la lista de renderizado.
         this.board.setDepth(-1);
 
         // ---------- ZONA DE MANO DEL OPONENTE (4 espacios) ----------
@@ -306,7 +303,6 @@ export default class GameScene extends Phaser.Scene {
                 duration: 150,
                 ease: 'Power1',
                 onComplete: () => {
-                    // --- ¡CORRECCIÓN CLAVE! ---
                     // Toda la lógica que ocurre después de jugar la carta se mueve aquí,
                     // dentro del 'onComplete' de la animación.
 
@@ -432,7 +428,6 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
 
-         // --- ¡AQUÍ ESTÁ LA MEJORA! ---
         // Para "reiniciar" el slot de destino, lo desactivamos temporalmente.
         // La nueva carta fusionada, al ser una dropzone, se encargará de capturar
         // los eventos de 'drop' en esa posición.
@@ -455,16 +450,15 @@ export default class GameScene extends Phaser.Scene {
         console.log(`Objetos visuales destruidos:`, [selectedName, targetName]);
 
         // 5. Crear la nueva carta fusionada.
-        // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
         // Seguimos el orden correcto: Crear, Configurar, Habilitar.
         const fusedCardObject = new Card(this, fusionPosition.x, fusionPosition.y, fusedCardData, false);
         fusedCardObject.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
         fusedCardObject.setData('isCardOnField', true);
         fusedCardObject.setData('fieldIndex', targetIndex);
-        // --- ¡CORRECCIÓN CLAVE! ---
+
         // Guardamos los datos de la carta para que la IA pueda leerlos.
         fusedCardObject.setData('cardData', fusedCardData);
-        // --- ¡CORRECCIÓN! ---
+    
         // Guardamos la posición y escala inicial para futuras selecciones/deselecciones.
         fusedCardObject.setData('isRevealed', true); // Las cartas fusionadas del jugador siempre están reveladas
         fusedCardObject.setData('startPosition', { x: fusionPosition.x, y: fusionPosition.y });
@@ -535,7 +529,6 @@ export default class GameScene extends Phaser.Scene {
         fusedCardObject.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
         fusedCardObject.setData('isCardOnField', true);
         fusedCardObject.setData('fieldIndex', targetIndex);
-        // --- ¡CORRECCIÓN CLAVE! ---
         // Guardamos los datos de la carta para que la IA pueda leerlos.
         fusedCardObject.setData('cardData', fusionResult);
         fusedCardObject.setData('isRevealed', true); // Las cartas fusionadas del jugador siempre están reveladas
@@ -566,7 +559,7 @@ export default class GameScene extends Phaser.Scene {
 
     /**
      * Inicia y ejecuta la lógica del turno del oponente.
-     * Esta es un boot muy simple para fines de prueba.
+     * Esta es un boot muy simple para fines de prueba. (En mejora continua, tendra tres niveles de dificultad.)
      */
     startOpponentTurn() {
         this.gameState = 'opponent-turn';
@@ -826,7 +819,6 @@ export default class GameScene extends Phaser.Scene {
      * @returns {object|null} El mejor objeto de ataque o null si no hay ataques posibles.
      */
     findBestAttack() {
-        // --- LÓGICA CORREGIDA! ---
         // La IA ya no mira el modelo de datos del jugador. Ahora busca los objetos visuales en el tablero.
         const opponentCardObjects = this.children.list.filter(c => c.getData('isOpponentCard') && c.getData('isCardOnField') && (c.getData('cooldown') || 0) === 0);
         const playerCardObjects = this.children.list.filter(c => !c.getData('isOpponentCard') && c.getData('isCardOnField'));
@@ -1059,7 +1051,6 @@ export default class GameScene extends Phaser.Scene {
      */
     update() {
         if (this.gameState === 'player-turn' && this.turnTimer) {
-            // --- ¡CORRECCIÓN! ---
             // Usamos getProgress() para tener un valor de 0 a 1 y lo multiplicamos por el total.
             // Math.ceil asegura que el último segundo se muestre como '1' en lugar de '0'.
             const remainingTime = Math.ceil((1 - this.turnTimer.getProgress()) * 12);
@@ -1520,7 +1511,6 @@ export default class GameScene extends Phaser.Scene {
         this.selectedCard = cardObject;
         console.log('Carta seleccionada:', cardObject.cardData);
 
-        // --- MODIFICACIÓN ---
         // La animación de "levantar" la carta ahora solo la mueve verticalmente.
         // No cambiaremos su tamaño para mantener la consistencia.
         const isOnField = !!cardObject.getData('isCardOnField');
@@ -1544,7 +1534,6 @@ export default class GameScene extends Phaser.Scene {
         this.selectedCard = null;
         console.log('Carta deseleccionada.');
         
-        // --- LÓGICA CORREGIDA ---
         // Si se debe animar, la carta (esté en la mano o en el campo) vuelve
         // a su posición original guardada en 'startPosition'.
         if (animate) {
@@ -1705,7 +1694,6 @@ export default class GameScene extends Phaser.Scene {
     createDecks() {
         const { width, height } = this.scale;
 
-        // --- ¡NUEVA LÓGICA! ---
         // Definimos un estilo y un padding para los contadores.
         const textStyle = { 
             fontSize: '24px', 

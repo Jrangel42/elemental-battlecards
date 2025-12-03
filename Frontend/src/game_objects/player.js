@@ -177,7 +177,6 @@ export default class Player {
         // Saca la carta de la mano
         this.hand.splice(cardFromHandIndex, 1);
 
-        // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
         // Buscamos la definición de la carta de nivel superior.
         const newLevel = cardOnField.level + 1;
         const newCardId = `${cardOnField.type}-${newLevel}`; // Ej: 'fuego-3'
@@ -188,7 +187,6 @@ export default class Player {
             return null;
         }
 
-        // --- ¡CORRECCIÓN! ---
         // La carta en el campo que se usa para la fusión debe ir al cementerio.
         // La añadimos al cementerio antes de reemplazarla.
         this.addCardDataToGraveyard(cardOnField);
