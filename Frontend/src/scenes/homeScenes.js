@@ -297,7 +297,7 @@ export default class HomeScenes extends Phaser.Scene {
         const btnMechanics = node.querySelector('[data-modal="mechanics"]');
 
         if (btnConfig) btnConfig.addEventListener('click', () => {
-            openModal("Configuración", "<p>Aquí va el contenido de configuración (reemplázalo).</p>");
+            openModal("Configuración");
         });
         if (btnAbout) btnAbout.addEventListener('click', () => {
             openModal("Acerca de", `<p>Este proyecto es un juego de cartas estratégico digital inspirado en la Teoría de Conjuntos, donde cada mecánica del sistema corresponde a una operación matemática formal.</p>

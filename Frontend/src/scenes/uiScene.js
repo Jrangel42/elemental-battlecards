@@ -82,7 +82,7 @@ export default class UIScene extends Phaser.Scene {
             fontStyle: 'bold',
             shadow: { offsetX: 2, offsetY: 2, color: '#000', blur: 3, fill: true }
         };
-        this.add.text(barX + barWidth * 0.22, topBarY, username, textStyle).setOrigin(0.5);
+        this.add.text(barX + barWidth * 0.22, topBarY, 'Jugador', textStyle).setOrigin(0.5);
         this.add.text(barX + barWidth * 0.5, topBarY, "VS", { ...textStyle, fontSize: '18px', fontStyle: 'normal' }).setOrigin(0.5);
         this.add.text(barX + barWidth * 0.78, topBarY, "Oponente", textStyle).setOrigin(0.5);
 
@@ -130,7 +130,7 @@ export default class UIScene extends Phaser.Scene {
         playerCounterFrame.strokeRoundedRect(-counterWidth / 2, -counterHeight / 2, counterWidth, counterHeight, 10);
 
         this.attackCounterTexts = {};
-        this.attackCounterTexts.player = this.add.text(playerCounterX, bottomBarY, `${username} ataque: turno 1`, bottomTextStyle).setOrigin(0.5);
+        this.attackCounterTexts.player = this.add.text(playerCounterX, bottomBarY, `Jugador ataque: turno 1`, bottomTextStyle).setOrigin(0.5);
 
         // --- TEMPORIZADOR DE TURNO (Centro) ---
         const timerWidth = 200;
