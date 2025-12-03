@@ -13,6 +13,10 @@ export default class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
         this.playerData = null; // Propiedad para guardar los datos del jugador
+        this.socket = null;
+        this.isLAN = false;
+        this.roomCode = null;
+        this.vsBot = false;
         this.selectedCard = null; // Propiedad para la carta seleccionada
         // --- MODIFICACIÓN ---
         // Eliminamos las escalas antiguas. Ahora usaremos un tamaño fijo.
@@ -48,7 +52,12 @@ export default class GameScene extends Phaser.Scene {
      * @param {object} data - Datos pasados desde la escena anterior.
      */
     init(data) {
-        this.playerData = data;
+        // data puede contener: playerData, socket, isLAN, roomCode, vsBot
+        this.playerData = data.playerData || data;
+        this.socket = data.socket || null;
+        this.isLAN = !!data.isLAN;
+        this.roomCode = data.roomCode || null;
+        this.vsBot = !!data.vsBot;
         console.log('GameScene iniciada con los datos del jugador:', this.playerData);
     }
 
@@ -138,6 +147,16 @@ export default class GameScene extends Phaser.Scene {
 
         // Mostramos un mensaje de bienvenida con el nombre del usuario temporal.
         console.log(`¡Bienvenido a GameScene, ${this.playerData?.username || 'Jugador'}!`);
+        // Si estamos en modo LAN y tenemos socket, conectar manejadores de red
+        if (this.isLAN && this.socket) {
+            this.socket.on('game_event', (payload) => {
+                try {
+                    this.handleRemoteGameEvent(payload);
+                } catch (e) {
+                    console.error('Error manejando evento remoto:', e);
+                }
+            });
+        }
         const { width, height } = this.scale;
         const battleRowYOffset = 70; // Distancia de las filas de batalla al centro
         // Lanza la escena de UI en paralelo para que se muestre por encima.
@@ -314,6 +333,13 @@ export default class GameScene extends Phaser.Scene {
 
                     // 4. Marcamos la acción y terminamos el turno.
                     this.playerHasActed = true;
+                    // Emitir evento de juego a oponente si estamos en LAN
+                    if (this.isLAN && this.socket) {
+                        try {
+                            this.socket.emit('game_event', { type: 'play_card', actor: this.player.id, card: cardPlayed, fieldIndex });
+                        } catch (e) { console.warn('No se pudo emitir evento de juego:', e); }
+                    }
+
                     this.time.delayedCall(200, () => this.endPlayerTurn());
                 }
             });
@@ -1571,6 +1597,49 @@ export default class GameScene extends Phaser.Scene {
         card.setData('isOpponentCard', true);
         card.setData('isRevealed', false); // siempre boca abajo al colocarse en campo
         return card;
+    }
+
+    /**
+     * Maneja eventos remotos que provienen del otro jugador via socket.
+     * Actualmente soporta: play_card
+     */
+    handleRemoteGameEvent(payload) {
+        if (!payload || !payload.type) return;
+        switch (payload.type) {
+            case 'play_card': {
+                const actor = payload.actor; // 'player' o 'opponent' desde el emisor
+                const card = payload.card;
+                const fieldIndex = payload.fieldIndex;
+
+                // En el cliente receptor, si el actor era 'player' del emisor,
+                // ese actor corresponde al 'opponent' local.
+                const isActorPlayerOnEmitter = actor === 'player';
+                const targetModel = isActorPlayerOnEmitter ? this.opponent : this.player;
+                const targetSlotsName = isActorPlayerOnEmitter ? 'opponent_battle_slots' : 'player_battle_slots';
+
+                // Actualizar modelo
+                try {
+                    targetModel.field[fieldIndex] = card;
+                } catch (e) {
+                    console.warn('No se pudo actualizar el modelo remoto:', e);
+                }
+
+                // Crear visual en el slot correspondiente
+                const slot = this[targetSlotsName] && this[targetSlotsName][fieldIndex];
+                if (slot) {
+                    const spawnX = slot.x;
+                    const spawnY = slot.y;
+                    const oppCard = this.createOpponentCard(spawnX, spawnY, card);
+                    oppCard.setData('isCardOnField', true);
+                    oppCard.setData('fieldIndex', fieldIndex);
+                    oppCard.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
+                }
+
+                break;
+            }
+            default:
+                console.log('Evento remoto no manejado:', payload.type);
+        }
     }
 
     /**

@@ -201,7 +201,8 @@ export default class HomeScenes extends Phaser.Scene {
                     <h2 style="margin-bottom:20px">Iniciar Partida</h2>
                     <p>Haz click en "Jugar Ahora" para comenzar.</p>
                     <div class="blank-box"></div>
-                    <button class="btn-primary" id="play">Jugar Ahora!</button>
+                    <button class="btn-primary" id="play">Jugar en LAN</button>
+                    <button class="btn-primary" id="play-bot" style="margin-top:10px; background:#0066cc;">Jugar con bot</button>
                 </section>
 
                 <section class="panel stats-panel">
@@ -450,12 +451,18 @@ export default class HomeScenes extends Phaser.Scene {
             if (modalElement) modalElement.classList.add('modal--tall');
         });
 
-        // Play button placeholder (puedes conectar lógica real)
+        // Play button (LAN) y Play vs Bot
         const playBtn = node.querySelector('#play');
         if (playBtn) playBtn.addEventListener('click', () => {
-            // Al hacer clic en "Jugar Ahora", llevamos al usuario a la escena de creación de sala.
-            console.log("Transicionando a la escena de creación de sala...");
-            this.scene.start('CreateRoomScene');
+            // Al hacer clic en "Jugar en LAN", llevamos al usuario a la escena de creación de sala.
+            console.log("Transicionando a la escena de creación de sala (LAN)...");
+            this.scene.start('CreateRoomScene', { playerData: this.playerData });
+        });
+
+        const playBotBtn = node.querySelector('#play-bot');
+        if (playBotBtn) playBotBtn.addEventListener('click', () => {
+            console.log('Iniciando partida contra Bot...');
+            this.scene.start('GameScene', { playerData: this.playerData, vsBot: true });
         });
 
         // Responsive resize handler

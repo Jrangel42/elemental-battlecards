@@ -1,8 +1,9 @@
+require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const User = require('../models/User'); // Usaremos nuestro modelo
+const { User } = require('../models'); // Sequelize models via models/index.js
 
-const JWT_SECRET = 'tu_secreto_super_secreto_y_largo'; // ¡Mover a variables de entorno!
+const JWT_SECRET = process.env.JWT_SECRET || 'tu_secreto_super_secreto_y_largo'; // Mover a .env
 
 /**
  * @desc    Registra un nuevo usuario
@@ -15,7 +16,7 @@ exports.registerUser = async (req, res) => {
             return res.status(400).json({ message: 'Por favor, proporciona todos los campos.' });
         }
 
-        const existingUser = await User.findByEmail(email);
+        const existingUser = await User.findOne({ where: { email } });
         if (existingUser) {
             return res.status(400).json({ message: 'El correo electrónico ya está en uso.' });
         }
@@ -23,11 +24,8 @@ exports.registerUser = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const newUser = { username, email, password: hashedPassword };
-        const savedUser = await User.create(newUser);
-
-        console.log('Usuario guardado:', savedUser);
-
+        const savedUser = await User.create({ username, email, password: hashedPassword });
+        console.log('Usuario guardado:', savedUser.id);
         res.status(201).json({ message: 'Usuario registrado exitosamente.' });
 
     } catch (error) {
@@ -47,7 +45,7 @@ exports.loginUser = async (req, res) => {
             return res.status(400).json({ message: 'Por favor, proporciona todos los campos.' });
         }
 
-        const user = await User.findByEmail(email);
+        const user = await User.findOne({ where: { email } });
         if (!user) {
             return res.status(400).json({ message: 'Credenciales inválidas.' });
         }
