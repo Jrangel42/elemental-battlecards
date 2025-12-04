@@ -294,18 +294,37 @@ export default class CreateRoomScene extends Phaser.Scene {
         const joinBtn = node.querySelector('#btn-join');
         if (joinBtn) {
             joinBtn.onclick = () => {
-                const code = node.querySelector('#input-room-code').value.replace(/\s+/g, '');
-                if (!code) return console.warn('Código vacío');
+                const rawCode = node.querySelector('#input-room-code').value;
+                const code = rawCode.replace(/\s+/g, '');
+                console.log('🔍 Intentando unirse a sala');
+                console.log('   Código raw:', `"${rawCode}"`);
+                console.log('   Código limpio:', `"${code}"`);
+                console.log('   Longitud:', code.length);
+                
+                if (!code) {
+                    console.warn('❌ Código vacío');
+                    alert('Por favor ingresa un código de sala');
+                    return;
+                }
+                
+                if (code.length !== 6) {
+                    console.warn('❌ Código debe tener 6 dígitos, tiene:', code.length);
+                    alert('El código debe tener 6 dígitos');
+                    return;
+                }
+                
+                console.log('📤 Enviando solicitud de unión con código:', code);
                 this.socket.emit('join_room', { code }, (res) => {
+                    console.log('📥 Respuesta del servidor:', res);
                     if (res && res.success) {
-                        console.log('Entré a la sala', res.code, 'rol:', res.role);
+                        console.log('✅ Entré a la sala', res.code, 'rol:', res.role);
                         this.currentRoom = res.code;
                         this.playerRole = res.role; // Guardar rol (guest)
                         this.playersInRoom = 2;
                         // NO iniciamos escena inmediatamente
                         // El evento 'game_start' del servidor iniciará la escena para ambos jugadores
                     } else {
-                        console.warn('No se pudo unir a la sala:', res && res.message);
+                        console.error('❌ No se pudo unir a la sala:', res && res.message);
                         alert(res && res.message ? res.message : 'No se pudo unir a la sala');
                     }
                 });

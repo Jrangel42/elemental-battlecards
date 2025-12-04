@@ -1,6 +1,9 @@
 // Manejo simple de salas con códigos de 6 dígitos usando socket.io
 module.exports = function(io) {
   const rooms = {}; // { code: { players: [{socketId, role}, ...], gameState: {} } }
+  
+  // Exponer rooms globalmente para debug
+  global.activeRooms = rooms;
 
   function generateCode() {
     return Math.floor(100000 + Math.random() * 900000).toString();
@@ -20,20 +23,26 @@ module.exports = function(io) {
         gameState: {
           currentTurn: 'host', // El anfitrión empieza
           turnNumber: 0
-        }
+        },
+        createdAt: Date.now()
       };
       socket.join(code);
       socket.roomCode = code;
       socket.playerRole = 'host';
 
-      console.log(`Sala creada ${code} por ${socket.id} (host)`);
+      console.log(`✅ Sala creada ${code} por ${socket.id} (host)`);
+      console.log(`📊 Total de salas activas: ${Object.keys(rooms).length}`);
       if (typeof cb === 'function') cb({ success: true, code, role: 'host' });
       io.to(code).emit('room_created', { code });
     });
 
     socket.on('join_room', (data, cb) => {
-      const code = (data && data.code) ? data.code.toString() : null;
+      const code = (data && data.code) ? data.code.toString().replace(/\s+/g, '') : null;
+      console.log(`Intento de unirse a sala. Código recibido: "${data && data.code}", Código limpio: "${code}"`);
+      console.log('Salas disponibles:', Object.keys(rooms));
+      
       if (!code || !rooms[code]) {
+        console.log(`Sala ${code} no encontrada. Salas existentes:`, Object.keys(rooms));
         if (typeof cb === 'function') cb({ success: false, message: 'Sala no encontrada.' });
         return;
       }

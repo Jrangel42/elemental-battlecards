@@ -37,6 +37,21 @@ app.get('/ping', (req, res) => {
     res.json({ ok: true, time: Date.now(), host: req.hostname });
 });
 
+// Debug endpoint para ver salas activas
+app.get('/rooms', (req, res) => {
+    const roomsInfo = {};
+    if (global.activeRooms) {
+        Object.keys(global.activeRooms).forEach(code => {
+            const room = global.activeRooms[code];
+            roomsInfo[code] = {
+                players: room.players.length,
+                playerIds: room.players.map(p => p.socketId)
+            };
+        });
+    }
+    res.json({ rooms: roomsInfo, totalRooms: Object.keys(roomsInfo).length });
+});
+
 const server = http.createServer(app);
 
 // Inicializar socket.io
