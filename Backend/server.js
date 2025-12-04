@@ -7,6 +7,7 @@ const cors = require('cors');
 // Importar módulos
 const connectDB = require('./config/db');
 const socketManager = require('./socketManager');
+const { displayNetworkInfo } = require('./show-network-info');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -65,5 +66,5 @@ const io = new Server(server, {
 socketManager(io);
 
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor corriendo en http://0.0.0.0:${PORT} (escuchando todas las interfaces)`);
+    displayNetworkInfo(PORT);
 });
