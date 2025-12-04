@@ -12,6 +12,8 @@ export default class GameSceneLAN extends Phaser.Scene {
     this.playerData = data.playerData || {};
     this.roomCode = data.roomCode || null;
     this.socket = data.socket || null;
+    this.playerRole = data.playerRole || null; // 'host' o 'guest'
+    this.gameStartData = data.gameStartData || null;
   }
 
   create() {
@@ -49,12 +51,25 @@ export default class GameSceneLAN extends Phaser.Scene {
         if (!res || !res.success) {
           console.warn('No se pudo unir a la sala desde GameSceneLAN:', res && res.message);
         }
-        // lanzamos la escena de juego principal y le pasamos el socket y roomCode
-        this.scene.start('GameScene', { playerData: this.playerData, roomCode: this.roomCode, socket: this.socket, isLAN: true });
+        // lanzamos la escena de juego principal y le pasamos el socket, roomCode y rol
+        this.scene.start('GameScene', { 
+          playerData: this.playerData, 
+          roomCode: this.roomCode, 
+          socket: this.socket, 
+          isLAN: true,
+          playerRole: this.playerRole,
+          gameStartData: this.gameStartData
+        });
       });
     } else {
       // Si no hay código, simplemente arrancar GameScene en modo LAN (sin room)
-      this.scene.start('GameScene', { playerData: this.playerData, roomCode: null, socket: this.socket, isLAN: true });
+      this.scene.start('GameScene', { 
+        playerData: this.playerData, 
+        roomCode: null, 
+        socket: this.socket, 
+        isLAN: true,
+        playerRole: this.playerRole
+      });
     }
   }
 }

@@ -6,6 +6,7 @@ import GameScene from './scenes/GameScene.js';
 import UIScene from './scenes/uiScene.js';  
 import HomeScenes from './scenes/homeScenes.js';
 import CreateRoomScene from './scenes/createRoomScene.js';
+import GameSceneLAN from './scenes/GameSceneLAN.js';
 
 const config = {
     type: Phaser.AUTO,
@@ -28,10 +29,11 @@ const config = {
      * 3. RegisterScene: Escena para el registro de nuevos usuarios.
      * 4. HomeScenes: El menú principal o lobby después de que el usuario inicie sesión.
      * 5. CreateRoomScene: Escena para crear una nueva partida.
-     * 6. GameScene: La escena principal del juego donde ocurre la acción.
-     * 7. UIScene: Se ejecuta en paralelo a GameScene para mostrar la interfaz de usuario.
+     * 6. GameSceneLAN: Escena de transición para partidas LAN.
+     * 7. GameScene: La escena principal del juego donde ocurre la acción.
+     * 8. UIScene: Se ejecuta en paralelo a GameScene para mostrar la interfaz de usuario.
      */
-    scene: [GameScene, PreloaderScene, LoginScene, RegisterScene, HomeScenes, CreateRoomScene,  UIScene]
+    scene: [PreloaderScene, LoginScene, RegisterScene, HomeScenes, CreateRoomScene, GameSceneLAN, GameScene, UIScene]
 }
 
 const game = new Phaser.Game(config);

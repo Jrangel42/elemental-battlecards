@@ -16,6 +16,8 @@ export default class GameScene extends Phaser.Scene {
         this.socket = null;
         this.isLAN = false;
         this.roomCode = null;
+        this.playerRole = null; // 'host' o 'guest' en modo LAN
+        this.gameStartData = null; // Datos de inicio del juego en modo LAN
         this.vsBot = false;
         this.selectedCard = null; // Propiedad para la carta seleccionada
         // Eliminamos las escalas antiguas. Ahora usaremos un tamaño fijo.
@@ -51,13 +53,16 @@ export default class GameScene extends Phaser.Scene {
      * @param {object} data - Datos pasados desde la escena anterior.
      */
     init(data) {
-        // data puede contener: playerData, socket, isLAN, roomCode, vsBot
+        // data puede contener: playerData, socket, isLAN, roomCode, vsBot, playerRole, gameStartData
         this.playerData = data.playerData || data;
         this.socket = data.socket || null;
         this.isLAN = !!data.isLAN;
         this.roomCode = data.roomCode || null;
+        this.playerRole = data.playerRole || null;
+        this.gameStartData = data.gameStartData || null;
         this.vsBot = !!data.vsBot;
         console.log('GameScene iniciada con los datos del jugador:', this.playerData);
+        console.log('Modo LAN:', this.isLAN, 'Rol:', this.playerRole);
     }
 
     preload() {
@@ -155,6 +160,17 @@ export default class GameScene extends Phaser.Scene {
                     console.error('Error manejando evento remoto:', e);
                 }
             });
+            
+            // Listener para cambios de turno
+            this.socket.on('turn_changed', (data) => {
+                console.log('%c[GameScene] Turno cambiado:', 'color: #00aaff', data);
+                // Verificar si es nuestro turno
+                if (data.currentTurn === this.playerRole) {
+                    this.startPlayerTurn();
+                } else {
+                    this.startOpponentTurn();
+                }
+            });
         }
         const { width, height } = this.scale;
         const battleRowYOffset = 70; // Distancia de las filas de batalla al centro
@@ -233,7 +249,21 @@ export default class GameScene extends Phaser.Scene {
         this.events.on('start-game', () => {
             if (this.gameState === 'pre-start') {
                 console.log('%c[GameScene] ¡La partida ha comenzado!', 'color: #28a745; font-size: 16px;');
-                this.startPlayerTurn();
+                
+                // En modo LAN, solo el host comienza su turno, el guest espera
+                if (this.isLAN) {
+                    if (this.playerRole === 'host') {
+                        this.startPlayerTurn();
+                    } else {
+                        // El guest espera su turno
+                        this.gameState = 'opponent-turn';
+                        this.events.emit('update-turn-indicator', 'opponent');
+                        console.log('%c[GameScene] Esperando turno del oponente (eres guest)', 'color: #ff8c00');
+                    }
+                } else {
+                    // Modo local o vs bot: el jugador siempre empieza
+                    this.startPlayerTurn();
+                }
             } else {
                 console.log('%c[GameScene] start-game ignorado: estado actual = ' + this.gameState, 'color: #bbbbbb');
             }
@@ -332,7 +362,12 @@ export default class GameScene extends Phaser.Scene {
                     // Emitir evento de juego a oponente si estamos en LAN
                     if (this.isLAN && this.socket) {
                         try {
-                            this.socket.emit('game_event', { type: 'play_card', actor: this.player.id, card: cardPlayed, fieldIndex });
+                            this.socket.emit('game_event', { 
+                                type: 'play_card', 
+                                actor: 'player', 
+                                card: cardPlayed, 
+                                fieldIndex 
+                            });
                         } catch (e) { console.warn('No se pudo emitir evento de juego:', e); }
                     }
 
@@ -478,6 +513,20 @@ export default class GameScene extends Phaser.Scene {
 
         // Consumir la acción y terminar el turno automáticamente.
         this.playerHasActed = true;
+        
+        // Emitir evento de fusión si estamos en LAN
+        if (this.isLAN && this.socket) {
+            try {
+                this.socket.emit('game_event', {
+                    type: 'fuse_cards',
+                    actor: 'player',
+                    sourceIndex: selIdx,
+                    targetIndex: tgtIdx,
+                    resultCard: fusedCardData
+                });
+            } catch (e) { console.warn('No se pudo emitir evento de fusión:', e); }
+        }
+        
         this.deselectCard(false);
         this.time.delayedCall(350, () => this.endPlayerTurn());
     }
@@ -553,6 +602,21 @@ export default class GameScene extends Phaser.Scene {
             duration: 300,
             ease: 'Power2'
         });
+
+        // Consumir acción y emitir evento de fusión desde mano si estamos en LAN
+        this.playerHasActed = true;
+        if (this.isLAN && this.socket) {
+            try {
+                this.socket.emit('game_event', {
+                    type: 'fuse_from_hand',
+                    actor: 'player',
+                    handCardId: handCardData.instanceId,
+                    targetIndex: targetIndex,
+                    resultCard: fusionResult
+                });
+            } catch (e) { console.warn('No se pudo emitir evento de fusión desde mano:', e); }
+        }
+        this.time.delayedCall(350, () => this.endPlayerTurn());
 
         // (No se admite fusiones desde la mano.)
     }
@@ -1009,7 +1073,20 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
 
-        this.startOpponentTurn();
+        // En modo LAN, notificar al servidor del fin de turno
+        if (this.isLAN && this.socket) {
+            try {
+                this.socket.emit('end_turn', { playerRole: this.playerRole });
+            } catch (e) {
+                console.warn('No se pudo emitir fin de turno:', e);
+            }
+        }
+        
+        // En modo local o bot, iniciar turno del oponente directamente
+        if (!this.isLAN) {
+            this.startOpponentTurn();
+        }
+        // En modo LAN, el evento 'turn_changed' del servidor iniciará el siguiente turno
     }
 
     /**
@@ -1043,7 +1120,12 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
 
-        this.startPlayerTurn();
+        // En modo LAN, el servidor gestiona los turnos (no llamamos startPlayerTurn aquí)
+        // En modo bot, sí llamamos startPlayerTurn
+        if (!this.isLAN) {
+            this.startPlayerTurn();
+        }
+        // En modo LAN, esperamos el evento 'turn_changed' del servidor
     }
 
     /**
@@ -1102,6 +1184,19 @@ export default class GameScene extends Phaser.Scene {
         // Registrar cooldowns / consecutiveAttacks
         this._registerCardAttack(attackingCardObject, 'player');
 
+        // Emitir evento de ataque si estamos en LAN
+        if (this.isLAN && this.socket) {
+            try {
+                this.socket.emit('game_event', {
+                    type: 'attack',
+                    actor: 'player',
+                    attackerIndex: attackingCardObject.getData('fieldIndex'),
+                    defenderIndex: defendingCardObject.getData('fieldIndex'),
+                    result: result
+                });
+            } catch (e) { console.warn('No se pudo emitir evento de ataque:', e); }
+        }
+
         this.animateAttack(attackingCardObject, defendingCardObject, result);
     }
 
@@ -1137,6 +1232,18 @@ export default class GameScene extends Phaser.Scene {
 
         // Registrar cooldown / consecutive attacks
         this._registerCardAttack(attackingCardObject, 'player');
+
+        // Emitir evento de ataque directo si estamos en LAN
+        if (this.isLAN && this.socket) {
+            try {
+                this.socket.emit('game_event', {
+                    type: 'direct_attack',
+                    actor: 'player',
+                    attackerIndex: attackingCardObject.getData('fieldIndex'),
+                    essenceType: attackerData.type
+                });
+            } catch (e) { console.warn('No se pudo emitir evento de ataque directo:', e); }
+        }
 
         // Animamos el ataque (hacia el centro)
         const targetPos = { x: this.scale.width / 2, y: this['opponent_battle_slots'][0].y };
@@ -1590,21 +1697,22 @@ export default class GameScene extends Phaser.Scene {
 
     /**
      * Maneja eventos remotos que provienen del otro jugador via socket.
-     * Actualmente soporta: play_card
+     * Soporta: play_card, fuse_cards, fuse_from_hand, attack, direct_attack
      */
     handleRemoteGameEvent(payload) {
         if (!payload || !payload.type) return;
+        
+        // El actor 'player' del emisor es 'opponent' para el receptor
+        const isRemotePlayer = payload.actor === 'player';
+        const targetModel = isRemotePlayer ? this.opponent : this.player;
+        const targetSlotsName = isRemotePlayer ? 'opponent_battle_slots' : 'player_battle_slots';
+        
+        console.log('%c[GameScene] Evento remoto recibido:', 'color: #00aaff', payload.type);
+        
         switch (payload.type) {
             case 'play_card': {
-                const actor = payload.actor; // 'player' o 'opponent' desde el emisor
                 const card = payload.card;
                 const fieldIndex = payload.fieldIndex;
-
-                // En el cliente receptor, si el actor era 'player' del emisor,
-                // ese actor corresponde al 'opponent' local.
-                const isActorPlayerOnEmitter = actor === 'player';
-                const targetModel = isActorPlayerOnEmitter ? this.opponent : this.player;
-                const targetSlotsName = isActorPlayerOnEmitter ? 'opponent_battle_slots' : 'player_battle_slots';
 
                 // Actualizar modelo
                 try {
@@ -1616,16 +1724,158 @@ export default class GameScene extends Phaser.Scene {
                 // Crear visual en el slot correspondiente
                 const slot = this[targetSlotsName] && this[targetSlotsName][fieldIndex];
                 if (slot) {
-                    const spawnX = slot.x;
-                    const spawnY = slot.y;
-                    const oppCard = this.createOpponentCard(spawnX, spawnY, card);
+                    const oppCard = this.createOpponentCard(slot.x, slot.y, card);
                     oppCard.setData('isCardOnField', true);
                     oppCard.setData('fieldIndex', fieldIndex);
                     oppCard.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
                 }
-
                 break;
             }
+            
+            case 'fuse_cards': {
+                const sourceIndex = payload.sourceIndex;
+                const targetIndex = payload.targetIndex;
+                const resultCard = payload.resultCard;
+                
+                // Actualizar modelo
+                targetModel.field[sourceIndex] = null;
+                targetModel.field[targetIndex] = resultCard;
+                
+                // Destruir objetos visuales en ambos índices
+                const cardObjs = this.children.list.filter(c => 
+                    c.getData('isOpponentCard') && 
+                    c.getData('isCardOnField') &&
+                    (c.getData('fieldIndex') === sourceIndex || c.getData('fieldIndex') === targetIndex)
+                );
+                cardObjs.forEach(obj => obj.destroy());
+                
+                // Crear carta fusionada
+                const slot = this[targetSlotsName][targetIndex];
+                if (slot) {
+                    const fusedObj = new Card(this, slot.x, slot.y, resultCard, true);
+                    fusedObj.setTexture(`card-${resultCard.type}-${resultCard.level}`);
+                    fusedObj.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
+                    fusedObj.setData('isOpponentCard', true);
+                    fusedObj.setData('cardData', resultCard);
+                    fusedObj.setData('fieldIndex', targetIndex);
+                    fusedObj.setData('isCardOnField', true);
+                    fusedObj.setData('isRevealed', true);
+                    fusedObj.on('pointerdown', () => this.onCardClicked(fusedObj));
+                }
+                break;
+            }
+            
+            case 'fuse_from_hand': {
+                const targetIndex = payload.targetIndex;
+                const resultCard = payload.resultCard;
+                
+                // Actualizar modelo
+                targetModel.field[targetIndex] = resultCard;
+                
+                // Destruir carta anterior en targetIndex
+                const oldCard = this.children.list.find(c => 
+                    c.getData('isOpponentCard') && 
+                    c.getData('isCardOnField') &&
+                    c.getData('fieldIndex') === targetIndex
+                );
+                if (oldCard) oldCard.destroy();
+                
+                // Crear carta fusionada
+                const slot = this[targetSlotsName][targetIndex];
+                if (slot) {
+                    const fusedObj = new Card(this, slot.x, slot.y, resultCard, true);
+                    fusedObj.setTexture(`card-${resultCard.type}-${resultCard.level}`);
+                    fusedObj.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
+                    fusedObj.setData('isOpponentCard', true);
+                    fusedObj.setData('cardData', resultCard);
+                    fusedObj.setData('fieldIndex', targetIndex);
+                    fusedObj.setData('isCardOnField', true);
+                    fusedObj.setData('isRevealed', true);
+                    fusedObj.on('pointerdown', () => this.onCardClicked(fusedObj));
+                }
+                
+                // Actualizar mano del oponente
+                this.refreshOpponentHand();
+                break;
+            }
+            
+            case 'attack': {
+                const attackerIndex = payload.attackerIndex;
+                const defenderIndex = payload.defenderIndex;
+                const result = payload.result;
+                
+                // Encontrar objetos visuales
+                const attackerObj = this.children.list.find(c => 
+                    c.getData('isOpponentCard') && 
+                    c.getData('isCardOnField') &&
+                    c.getData('fieldIndex') === attackerIndex
+                );
+                const defenderObj = this.children.list.find(c => 
+                    !c.getData('isOpponentCard') && 
+                    c.getData('isCardOnField') &&
+                    c.getData('fieldIndex') === defenderIndex
+                );
+                
+                if (!attackerObj || !defenderObj) {
+                    console.warn('No se encontraron las cartas para el ataque remoto');
+                    break;
+                }
+                
+                // Revelar atacante
+                this.revealOpponentCard(attackerObj);
+                this.revealPlayerCard(defenderObj);
+                
+                // Animar ataque
+                this.tweens.add({
+                    targets: attackerObj,
+                    x: defenderObj.x,
+                    y: defenderObj.y,
+                    duration: 200,
+                    yoyo: true,
+                    ease: 'Power1',
+                    onComplete: () => {
+                        // Aplicar resultado
+                        if (result.loser === 'attacker') {
+                            this.destroyCard(this.opponent, attackerIndex);
+                        } else if (result.loser === 'defender') {
+                            this.destroyCard(this.player, defenderIndex);
+                        }
+                    }
+                });
+                break;
+            }
+            
+            case 'direct_attack': {
+                const attackerIndex = payload.attackerIndex;
+                const essenceType = payload.essenceType;
+                
+                // Encontrar atacante
+                const attackerObj = this.children.list.find(c => 
+                    c.getData('isOpponentCard') && 
+                    c.getData('isCardOnField') &&
+                    c.getData('fieldIndex') === attackerIndex
+                );
+                
+                if (attackerObj) {
+                    this.revealOpponentCard(attackerObj);
+                    
+                    // Llenar esencia del oponente
+                    this.opponent.fillEssence(essenceType);
+                    
+                    // Animar ataque directo
+                    const targetPos = { x: this.scale.width / 2, y: this['player_battle_slots'][0].y };
+                    this.tweens.add({
+                        targets: attackerObj,
+                        x: targetPos.x,
+                        y: targetPos.y,
+                        duration: 200,
+                        yoyo: true,
+                        ease: 'Power1'
+                    });
+                }
+                break;
+            }
+            
             default:
                 console.log('Evento remoto no manejado:', payload.type);
         }

@@ -188,6 +188,7 @@ export default class CreateRoomScene extends Phaser.Scene {
         this.socket = io(SERVER_URL);
         this.currentRoom = null;
         this.playersInRoom = 0;
+        this.playerRole = null; // 'host' o 'guest'
 
         this.socket.on('connect', () => {
             console.log('Socket conectado (cliente):', this.socket.id);
@@ -216,12 +217,31 @@ export default class CreateRoomScene extends Phaser.Scene {
             updateCodeUI(code);
         });
 
-        this.socket.on('player_joined', ({ players }) => {
+        this.socket.on('player_joined', ({ players, canStart }) => {
             this.playersInRoom = players || (this.playersInRoom + 1);
             const playersEl = this.domUI.node.querySelector('h3');
             if (playersEl) playersEl.textContent = `Jugadores en sala: ${this.playersInRoom}/2`;
             const statusEl = this.domUI.node.querySelectorAll('.input-box')[3];
             if (statusEl) statusEl.textContent = 'Jugador conectado!';
+            
+            // Si la sala está completa y podemos iniciar, el botón cambia de texto
+            if (canStart) {
+                const startBtn = this.domUI.node.querySelector('#btn-start');
+                if (startBtn) startBtn.textContent = '¡Iniciar Partida!';
+            }
+        });
+        
+        // Listener para cuando el juego puede comenzar automáticamente
+        this.socket.on('game_start', (data) => {
+            console.log('Juego iniciando...', data);
+            this.keepSocket = true;
+            this.scene.start('GameSceneLAN', { 
+                roomCode: this.currentRoom, 
+                socket: this.socket, 
+                playerData: this.playerData,
+                playerRole: this.playerRole,
+                gameStartData: data
+            });
         });
 
         this.socket.on('player_left', () => {
@@ -244,21 +264,27 @@ export default class CreateRoomScene extends Phaser.Scene {
             if (!this.currentRoom) {
                 this.socket.emit('create_room', (res) => {
                     if (res && res.success && res.code) {
-                        console.log('Sala creada con código', res.code);
+                        console.log('Sala creada con código', res.code, 'rol:', res.role);
+                        this.playerRole = res.role; // Guardar rol (host)
                         // UI se actualiza por el evento 'room_created'
                         // también actualizamos inmediatamente por si el evento llega después
                         updateCodeUI(res.code);
-                        // Mantener el socket vivo y lanzar la escena LAN
-                        this.keepSocket = true;
-                        this.scene.start('GameSceneLAN', { roomCode: res.code, socket: this.socket, playerData: this.playerData });
+                        // NO iniciamos escena inmediatamente, esperamos a que se una el segundo jugador
+                        // El evento 'game_start' iniciará la escena automáticamente
                     } else {
                         console.error('Error creando sala', res);
                     }
                 });
             } else {
+                // Si ya estamos en una sala y hay 2 jugadores, iniciar manualmente
                 if (this.playersInRoom >= 2) {
                     this.keepSocket = true;
-                    this.scene.start('GameSceneLAN', { roomCode: this.currentRoom, socket: this.socket, playerData: this.playerData });
+                    this.scene.start('GameSceneLAN', { 
+                        roomCode: this.currentRoom, 
+                        socket: this.socket, 
+                        playerData: this.playerData,
+                        playerRole: this.playerRole
+                    });
                 } else {
                     console.log('Esperando al segundo jugador antes de iniciar.');
                 }
@@ -272,15 +298,16 @@ export default class CreateRoomScene extends Phaser.Scene {
                 if (!code) return console.warn('Código vacío');
                 this.socket.emit('join_room', { code }, (res) => {
                     if (res && res.success) {
-                            console.log('Entré a la sala', res.code);
-                            this.currentRoom = res.code;
-                            this.playersInRoom = 2;
-                            this.keepSocket = true;
-                            this.scene.start('GameSceneLAN', { roomCode: this.currentRoom, socket: this.socket, playerData: this.playerData });
-                        } else {
-                            console.warn('No se pudo unir a la sala:', res && res.message);
-                            alert(res && res.message ? res.message : 'No se pudo unir a la sala');
-                        }
+                        console.log('Entré a la sala', res.code, 'rol:', res.role);
+                        this.currentRoom = res.code;
+                        this.playerRole = res.role; // Guardar rol (guest)
+                        this.playersInRoom = 2;
+                        // NO iniciamos escena inmediatamente
+                        // El evento 'game_start' del servidor iniciará la escena para ambos jugadores
+                    } else {
+                        console.warn('No se pudo unir a la sala:', res && res.message);
+                        alert(res && res.message ? res.message : 'No se pudo unir a la sala');
+                    }
                 });
             };
         }
