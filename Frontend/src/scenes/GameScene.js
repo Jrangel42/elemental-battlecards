@@ -646,6 +646,15 @@ export default class GameScene extends Phaser.Scene {
             }
         });
 
+        // 🎮 EN MODO LAN: No ejecutar IA, solo esperar acciones del oponente remoto
+        if (this.isLAN) {
+            console.log('%c[LAN] Turno del oponente - Esperando su acción...', 'color: #00aaff');
+            this.events.emit('update-turn-indicator', 'opponent');
+            // El oponente jugará desde su cliente, los eventos llegarán por socket
+            return;
+        }
+
+        // 🤖 MODO BOT: Ejecutar IA del oponente
         console.log('%c[Opponent] Analizando acciones...', 'color: #ff8c00');
 
         this.time.delayedCall(800, () => {
@@ -1709,6 +1718,9 @@ export default class GameScene extends Phaser.Scene {
         
         console.log('%c[GameScene] Evento remoto recibido:', 'color: #00aaff', payload.type);
         
+        // Marcar que el oponente ha actuado (solo si es su turno y es una acción del oponente remoto)
+        const isOpponentAction = isRemotePlayer && this.gameState === 'opponent-turn';
+        
         switch (payload.type) {
             case 'play_card': {
                 const card = payload.card;
@@ -1728,6 +1740,11 @@ export default class GameScene extends Phaser.Scene {
                     oppCard.setData('isCardOnField', true);
                     oppCard.setData('fieldIndex', fieldIndex);
                     oppCard.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
+                }
+                
+                // En LAN, marcar que el oponente actuó
+                if (isOpponentAction) {
+                    this.opponentHasActed = true;
                 }
                 break;
             }
@@ -1761,6 +1778,11 @@ export default class GameScene extends Phaser.Scene {
                     fusedObj.setData('isCardOnField', true);
                     fusedObj.setData('isRevealed', true);
                     fusedObj.on('pointerdown', () => this.onCardClicked(fusedObj));
+                }
+                
+                // En LAN, marcar que el oponente actuó
+                if (isOpponentAction) {
+                    this.opponentHasActed = true;
                 }
                 break;
             }
@@ -1796,6 +1818,11 @@ export default class GameScene extends Phaser.Scene {
                 
                 // Actualizar mano del oponente
                 this.refreshOpponentHand();
+                
+                // En LAN, marcar que el oponente actuó
+                if (isOpponentAction) {
+                    this.opponentHasActed = true;
+                }
                 break;
             }
             
@@ -1840,6 +1867,12 @@ export default class GameScene extends Phaser.Scene {
                         } else if (result.loser === 'defender') {
                             this.destroyCard(this.player, defenderIndex);
                         }
+                        
+                        // En LAN, marcar que el oponente actuó y realizó ataque
+                        if (isOpponentAction) {
+                            this.opponentHasActed = true;
+                            this.opponentPerformedAttackThisTurn = true;
+                        }
                     }
                 });
                 break;
@@ -1870,7 +1903,14 @@ export default class GameScene extends Phaser.Scene {
                         y: targetPos.y,
                         duration: 200,
                         yoyo: true,
-                        ease: 'Power1'
+                        ease: 'Power1',
+                        onComplete: () => {
+                            // En LAN, marcar que el oponente actuó y realizó ataque
+                            if (isOpponentAction) {
+                                this.opponentHasActed = true;
+                                this.opponentPerformedAttackThisTurn = true;
+                            }
+                        }
                     });
                 }
                 break;
