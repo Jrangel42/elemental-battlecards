@@ -484,22 +484,10 @@ export default class GameScene extends Phaser.Scene {
 
         console.log(`Objetos visuales destruidos:`, [selectedName, targetName]);
 
-        // 5. Crear la nueva carta fusionada.
-        // Seguimos el orden correcto: Crear, Configurar, Habilitar.
-        const fusedCardObject = new Card(this, fusionPosition.x, fusionPosition.y, fusedCardData, false);
-        fusedCardObject.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
-        fusedCardObject.setData('isCardOnField', true);
-        fusedCardObject.setData('fieldIndex', targetIndex);
-
-        // Guardamos los datos de la carta para que la IA pueda leerlos.
-        fusedCardObject.setData('cardData', fusedCardData);
-    
-        // Guardamos la posición y escala inicial para futuras selecciones/deselecciones.
-        fusedCardObject.setData('isRevealed', true); // Las cartas fusionadas del jugador siempre están reveladas
-        fusedCardObject.setData('startPosition', { x: fusionPosition.x, y: fusionPosition.y });
-
-        // Hacemos que la nueva carta sea seleccionable para futuras acciones
-        fusedCardObject.on('pointerdown', () => this.onCardClicked(fusedCardObject));
+        // 5. Crear la nueva carta fusionada (visual) usando helper centralizado.
+        const fusedCardObject = this.createFieldCardAt(fusionPosition.x, fusionPosition.y, fusedCardData, { isOpponent: false, revealed: true, fieldIndex: targetIndex });
+        // Guardamos también la escala inicial por compatibilidad con animaciones de selección.
+        fusedCardObject.setData('startScale', fusedCardObject.scale);
         this.deselectCard(false); // Deseleccionamos sin animación
 
         // Animación de aparición (fade-in). No cambiamos escala para evitar overflow.
@@ -571,20 +559,9 @@ export default class GameScene extends Phaser.Scene {
         handCardObject.destroy();
         fieldCardObject.destroy();
 
-        // 4. Creamos el nuevo objeto visual para la carta fusionada.
-        const fusedCardObject = new Card(this, fusionPosition.x, fusionPosition.y, fusionResult, false);
-        // Normalizamos por tamaño real del sprite (independiente de la resolución del asset)
-        // La carta resultante va al campo, por lo que debe usar el tamaño de campo.
-        fusedCardObject.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
-        fusedCardObject.setData('isCardOnField', true);
-        fusedCardObject.setData('fieldIndex', targetIndex);
-        // Guardamos los datos de la carta para que la IA pueda leerlos.
-        fusedCardObject.setData('cardData', fusionResult);
-        fusedCardObject.setData('isRevealed', true); // Las cartas fusionadas del jugador siempre están reveladas
-        fusedCardObject.setData('startPosition', { x: fusionPosition.x, y: fusionPosition.y });
-        
-        // Hacemos que la nueva carta sea seleccionable.
-        fusedCardObject.on('pointerdown', () => this.onCardClicked(fusedCardObject));
+        // 4. Creamos el nuevo objeto visual para la carta fusionada usando helper.
+        const fusedCardObject = this.createFieldCardAt(fusionPosition.x, fusionPosition.y, fusionResult, { isOpponent: false, revealed: true, fieldIndex: targetIndex });
+        fusedCardObject.setData('startScale', fusedCardObject.scale);
 
         // 5. Limpiamos la selección y refrescamos la mano.
         this.deselectCard(false); // Deseleccionamos sin animación.
@@ -593,15 +570,9 @@ export default class GameScene extends Phaser.Scene {
         this.player.drawCard();
         this.refreshPlayerHand(); // Actualizamos la mano para que se reordene.
         this.updateDeckCounts(); // Actualizamos el contador del mazo.
-        // Animación de aparición para la nueva carta.
-        // Aparecer con fade-in en lugar de cambiar escala.
+        // Animación de aparición: fade-in (el helper mantiene el tamaño constante).
         fusedCardObject.alpha = 0;
-        this.tweens.add({
-            targets: fusedCardObject,
-            alpha: { from: 0, to: 1 },
-            duration: 300,
-            ease: 'Power2'
-        });
+        this.tweens.add({ targets: fusedCardObject, alpha: { from: 0, to: 1 }, duration: 300, ease: 'Power2' });
 
         // Consumir acción y emitir evento de fusión desde mano si estamos en LAN
         this.playerHasActed = true;
@@ -704,17 +675,9 @@ export default class GameScene extends Phaser.Scene {
 
                         // Crear UNA sola carta fusionada en el slot correcto y dejarla revelada.
                         const slotObj = this['opponent_battle_slots'][targetIndex];
-                        const fusedObj = new Card(this, slotObj.x, slotObj.y, res.newCard, true);
-                        // Asegurar textura frontal y luego normalizar tamaño visual/escala a dimensiones de campo
-                        fusedObj.setTexture(`card-${res.newCard.type}-${res.newCard.level}`);
-                        fusedObj.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height); // Tamaño unificado
-                        fusedObj.setData('isOpponentCard', true);
-                        fusedObj.setData('cardData', res.newCard);
-                        fusedObj.setData('fieldIndex', targetIndex);
-                        fusedObj.setData('isCardOnField', true);
-                        fusedObj.setData('isRevealed', true);
-                        fusedObj.setData('startPosition', { x: slotObj.x, y: slotObj.y });
-                        fusedObj.on('pointerdown', () => this.onCardClicked(fusedObj));
+                        const fusedObj = this.createFieldCard(slotObj, res.newCard, { isOpponent: true, revealed: true, fieldIndex: targetIndex });
+                        // Asegurar textura frontal por si el constructor de Card no la aplicó automáticamente
+                        try { fusedObj.setTexture(`card-${res.newCard.type}-${res.newCard.level}`); } catch (e) {}
 
                         acted = true;
                         // Fusión de campo NO cambia la mano/mazo -> no drawCard aquí.
@@ -728,15 +691,8 @@ export default class GameScene extends Phaser.Scene {
                     const fused = this.opponent.fuseFromHand(fusionPlan.handInstanceId, fusionPlan.targetIndex);
                     if (fused) {
                         const slotObj = this['opponent_battle_slots'][fusionPlan.targetIndex];
-                        const fusedObj = new Card(this, slotObj.x, slotObj.y, fused, true);
-                        fusedObj.setTexture(`card-${fused.type}-${fused.level}`);
-                        fusedObj.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
-                        fusedObj.setData('isOpponentCard', true);
-                        fusedObj.setData('cardData', fused);
-                        fusedObj.setData('fieldIndex', fusionPlan.targetIndex);
-                        fusedObj.setData('isCardOnField', true);
-                        fusedObj.setData('isRevealed', true);
-                        fusedObj.on('pointerdown', () => this.onCardClicked(fusedObj));
+                        const fusedObj = this.createFieldCard(slotObj, fused, { isOpponent: true, revealed: true, fieldIndex: fusionPlan.targetIndex });
+                        try { fusedObj.setTexture(`card-${fused.type}-${fused.level}`); } catch (e) {}
                         acted = true;
                         this.opponent.drawCard();
                         this.refreshOpponentHand();
@@ -863,14 +819,7 @@ export default class GameScene extends Phaser.Scene {
                     const played = this.opponent.playCardFromHand(cardToPlay.instanceId, slotIndex);
                     if (played) {
                         const slotObj = this['opponent_battle_slots'][slotIndex];
-                        const newCardObj = new Card(this, slotObj.x, slotObj.y, played, true);
-                        newCardObj.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height); // Tamaño unificado
-                        newCardObj.setData('isOpponentCard', true);
-                        newCardObj.setData('cardData', played);
-                        newCardObj.setData('fieldIndex', slotIndex);
-                        newCardObj.setData('isCardOnField', true);
-                        newCardObj.setData('isRevealed', false);
-                        newCardObj.on('pointerdown', () => this.onCardClicked(newCardObj));
+                        const newCardObj = this.createFieldCard(slotObj, played, { isOpponent: true, revealed: false, fieldIndex: slotIndex });
                         this.opponent.drawCard();
                         this.refreshOpponentHand();
                         this.updateDeckCounts();
@@ -1705,6 +1654,35 @@ export default class GameScene extends Phaser.Scene {
     }
 
     /**
+     * Helper: crear una carta visual en un slot del campo y normalizar su visual.
+     * @param {object} slotObj - El objeto slot con propiedades x,y
+     * @param {object} cardData - Datos de la carta del modelo
+     * @param {object} options - { isOpponent: bool, revealed: bool, fieldIndex: number }
+     * @returns {Card} objeto visual creado
+     */
+    createFieldCard(slotObj, cardData, options = {}) {
+        const { isOpponent = false, revealed = false, fieldIndex = null } = options;
+        const cardObj = new Card(this, slotObj.x, slotObj.y, cardData, isOpponent);
+        cardObj.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
+        if (isOpponent) cardObj.setData('isOpponentCard', true);
+        cardObj.setData('cardData', cardData);
+        cardObj.setData('isCardOnField', true);
+        if (fieldIndex !== null && typeof fieldIndex !== 'undefined') cardObj.setData('fieldIndex', fieldIndex);
+        cardObj.setData('isRevealed', !!revealed);
+        cardObj.setData('startPosition', { x: slotObj.x, y: slotObj.y });
+        cardObj.on('pointerdown', () => this.onCardClicked(cardObj));
+        return cardObj;
+    }
+
+    /**
+     * Helper: crear una carta visual en coordenadas dadas (útil para fusiones que usan posiciones previas).
+     */
+    createFieldCardAt(x, y, cardData, options = {}) {
+        const dummySlot = { x, y };
+        return this.createFieldCard(dummySlot, cardData, options);
+    }
+
+    /**
      * Maneja eventos remotos que provienen del otro jugador via socket.
      * Soporta: play_card, fuse_cards, fuse_from_hand, attack, direct_attack
      */
@@ -1733,13 +1711,10 @@ export default class GameScene extends Phaser.Scene {
                     console.warn('No se pudo actualizar el modelo remoto:', e);
                 }
 
-                // Crear visual en el slot correspondiente
+                // Crear visual en el slot correspondiente usando helper central
                 const slot = this[targetSlotsName] && this[targetSlotsName][fieldIndex];
                 if (slot) {
-                    const oppCard = this.createOpponentCard(slot.x, slot.y, card);
-                    oppCard.setData('isCardOnField', true);
-                    oppCard.setData('fieldIndex', fieldIndex);
-                    oppCard.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
+                    const oppCard = this.createFieldCard(slot, card, { isOpponent: isRemotePlayer, revealed: false, fieldIndex });
                 }
                 
                 // En LAN, marcar que el oponente actuó
@@ -1769,15 +1744,8 @@ export default class GameScene extends Phaser.Scene {
                 // Crear carta fusionada
                 const slot = this[targetSlotsName][targetIndex];
                 if (slot) {
-                    const fusedObj = new Card(this, slot.x, slot.y, resultCard, true);
-                    fusedObj.setTexture(`card-${resultCard.type}-${resultCard.level}`);
-                    fusedObj.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
-                    fusedObj.setData('isOpponentCard', true);
-                    fusedObj.setData('cardData', resultCard);
-                    fusedObj.setData('fieldIndex', targetIndex);
-                    fusedObj.setData('isCardOnField', true);
-                    fusedObj.setData('isRevealed', true);
-                    fusedObj.on('pointerdown', () => this.onCardClicked(fusedObj));
+                    const fusedObj = this.createFieldCard(slot, resultCard, { isOpponent: true, revealed: true, fieldIndex: targetIndex });
+                    try { fusedObj.setTexture(`card-${resultCard.type}-${resultCard.level}`); } catch (e) {}
                 }
                 
                 // En LAN, marcar que el oponente actuó
@@ -1805,15 +1773,8 @@ export default class GameScene extends Phaser.Scene {
                 // Crear carta fusionada
                 const slot = this[targetSlotsName][targetIndex];
                 if (slot) {
-                    const fusedObj = new Card(this, slot.x, slot.y, resultCard, true);
-                    fusedObj.setTexture(`card-${resultCard.type}-${resultCard.level}`);
-                    fusedObj.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
-                    fusedObj.setData('isOpponentCard', true);
-                    fusedObj.setData('cardData', resultCard);
-                    fusedObj.setData('fieldIndex', targetIndex);
-                    fusedObj.setData('isCardOnField', true);
-                    fusedObj.setData('isRevealed', true);
-                    fusedObj.on('pointerdown', () => this.onCardClicked(fusedObj));
+                    const fusedObj = this.createFieldCard(slot, resultCard, { isOpponent: true, revealed: true, fieldIndex: targetIndex });
+                    try { fusedObj.setTexture(`card-${resultCard.type}-${resultCard.level}`); } catch (e) {}
                 }
                 
                 // Actualizar mano del oponente
