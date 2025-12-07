@@ -138,6 +138,8 @@ export default class GameScene extends Phaser.Scene {
         this.gameState = 'pre-start';
         this.playerHasActed = false;
         this.opponentHasActed = false;
+        // Set para marcar destrucciones en curso y evitar doble procesamiento
+        this._pendingDestroys = new Set();
         this.playerPerformedAttackThisTurn = false;
         this.opponentPerformedAttackThisTurn = false;
         this.playerTurnsSinceLastAttack = 0;
@@ -163,7 +165,7 @@ export default class GameScene extends Phaser.Scene {
             
             // Listener para cambios de turno
             this.socket.on('turn_changed', (data) => {
-                console.log('%c[GameScene] Turno cambiado:', 'color: #00aaff', data);
+                console.log('[GameScene] Cambio de turno recibido', { currentTurn: data.currentTurn, data });
                 // Verificar si es nuestro turno
                 if (data.currentTurn === this.playerRole) {
                     this.startPlayerTurn();
@@ -195,11 +197,11 @@ export default class GameScene extends Phaser.Scene {
                 // Si la esencia no ha sido llenada previamente...
                 if (!this.essences.has(essenceType)) {
                     this.essences.add(essenceType); // La añadimos al Set.
-                    console.log(`%c[Player ${this.id}] Esencia ${essenceType} llenada. Total: ${this.essences.size}`, 'color: #00ffaa');
+                    console.log('[GameScene] Esencia activada', { playerId: this.id, essenceType, total: this.essences.size });
                     // Emitimos un evento para que la UIScene actualice los orbes.
                     this.scene.events.emit('essence-activated', this.id, essenceType);
                 } else {
-                    console.log(`%c[Player ${this.id}] Ya tiene la esencia ${essenceType}.`, 'color: #aaaaaa');
+                    console.log('[GameScene] Esencia ya activada previamente', { playerId: this.id, essenceType });
                 }
             };
         };
@@ -248,7 +250,7 @@ export default class GameScene extends Phaser.Scene {
         this.events.off('start-game');
         this.events.on('start-game', () => {
             if (this.gameState === 'pre-start') {
-                console.log('%c[GameScene] ¡La partida ha comenzado!', 'color: #28a745; font-size: 16px;');
+                console.log('[GameScene] ¡La partida ha comenzado!', { player: this.playerData?.username || 'Jugador' });
                 
                 // En modo LAN, solo el host comienza su turno, el guest espera
                 if (this.isLAN) {
@@ -258,14 +260,14 @@ export default class GameScene extends Phaser.Scene {
                         // El guest espera su turno
                         this.gameState = 'opponent-turn';
                         this.events.emit('update-turn-indicator', 'opponent');
-                        console.log('%c[GameScene] Esperando turno del oponente (eres guest)', 'color: #ff8c00');
+                        console.log('[GameScene] Esperando turno del oponente (eres guest)');
                     }
                 } else {
                     // Modo local o vs bot: el jugador siempre empieza
                     this.startPlayerTurn();
                 }
             } else {
-                console.log('%c[GameScene] start-game ignorado: estado actual = ' + this.gameState, 'color: #bbbbbb');
+                console.log('[GameScene] start-game ignorado', { estadoActual: this.gameState });
             }
         });
 
@@ -294,11 +296,11 @@ export default class GameScene extends Phaser.Scene {
         // Bloquear jugadas si no es el turno del jugador o ya actuó, o si está obligado a atacar
         if (this.gameState !== 'player-turn') return;
         if (this.playerHasActed) {
-            console.log('%c[GameScene] Ya realizaste tu acción este turno.', 'color:#ff4444');
+            console.log('[GameScene] Ya realizaste tu acción este turno.');
             return;
         }
         if (this.playerMustAttackThisTurn) {
-            console.log('%c[GameScene] Estás obligado a atacar este turno. No puedes colocar cartas.', 'color:#ff4444');
+            console.log('[GameScene] Estás obligado a atacar este turno. No puedes colocar cartas.');
             return;
         }
 
@@ -307,7 +309,7 @@ export default class GameScene extends Phaser.Scene {
         const fieldIndex = parseInt(dropZone.name.split('-')[1]);
         const targetCardData = this.player.field[fieldIndex];
 
-        console.log(`Intentando jugar la carta en el slot ${fieldIndex}`);
+        console.log('[GameScene] Intento de jugar carta en slot', { slotIndex: fieldIndex, cardFromHand: cardDataFromHand && { id: cardDataFromHand.id, instanceId: cardDataFromHand.instanceId, type: cardDataFromHand.type, level: cardDataFromHand.level } });
 
         // Escenario 1: El slot está vacío. Jugamos la carta normalmente.
         if (targetCardData === null) {
@@ -357,14 +359,16 @@ export default class GameScene extends Phaser.Scene {
                     this.refreshPlayerHand();
                     this.updateDeckCounts();
 
-                    // 4. Marcamos la acción y terminamos el turno.
+                            // 4. Marcamos la acción y terminamos el turno.
                     this.playerHasActed = true;
+                            console.log('[GameScene] Jugador colocó carta en el campo', { cardId: cardPlayed.id, instanceId: cardPlayed.instanceId, type: cardPlayed.type, level: cardPlayed.level, fieldIndex });
                     // Emitir evento de juego a oponente si estamos en LAN
-                    if (this.isLAN && this.socket) {
+                        if (this.isLAN && this.socket) {
                         try {
                             this.socket.emit('game_event', { 
                                 type: 'play_card', 
                                 actor: 'player', 
+                                playerRole: this.playerRole || null,
                                 card: cardPlayed, 
                                 fieldIndex 
                             });
@@ -391,11 +395,11 @@ export default class GameScene extends Phaser.Scene {
         // Bloquear fusiones si no es turno o ya actuó
         if (this.gameState !== 'player-turn') return;
         if (this.playerHasActed) {
-            console.log('%c[GameScene] Ya realizaste tu acción este turno.', 'color:#ff4444');
+            console.log('[GameScene] Ya realizaste tu acción este turno.');
             return;
         }
         if (this.playerMustAttackThisTurn) {
-            console.log('%c[GameScene] Estás obligado a atacar este turno. No puedes fusionar.', 'color:#ff4444');
+            console.log('[GameScene] Estás obligado a atacar este turno. No puedes fusionar.');
             return;
         }
 
@@ -412,7 +416,7 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
         
-        console.log(`Intento de fusionar ${initiatingFusionCardData.id} con ${targetCardData.id}`);
+        console.log('[GameScene] Intento de fusión entre cartas del campo', { sourceId: initiatingFusionCardData.id, targetId: targetCardData.id, sourceType: initiatingFusionCardData.type, targetType: targetCardData.type });
         
         // --- Validaciones ---
         const areSameType = initiatingFusionCardData.type === targetCardData.type;
@@ -426,8 +430,6 @@ export default class GameScene extends Phaser.Scene {
         }
 
         // TODO: Validar que el jugador tiene una acción disponible para fusionar.
-
-        console.log('%cFusión exitosa!', 'color: #00ffaa');
 
         // --- Ejecutar Fusión ---
         // 3. Asegurar sincronía entre la vista y el modelo antes de actualizar datos.
@@ -457,6 +459,7 @@ export default class GameScene extends Phaser.Scene {
 
         // 3. Actualizar el modelo de datos.
         const fusionResult = this.player.fuseCards(selIdx, tgtIdx);
+        console.log('[GameScene] Fusión de campo procesada', { sourceIndex: selIdx, targetIndex: tgtIdx, result: fusionResult });
         if (!fusionResult) {
             console.error("Error en el modelo de datos al fusionar.");
             this.deselectCard();
@@ -482,7 +485,7 @@ export default class GameScene extends Phaser.Scene {
         selectedCardObject.destroy();
         targetCardObject.destroy();
 
-        console.log(`Objetos visuales destruidos:`, [selectedName, targetName]);
+        console.log('[GameScene] Objetos visuales eliminados tras fusión', { destroyed: [selectedName, targetName], sourceIndex: selIdx, targetIndex: tgtIdx });
 
         // 5. Crear la nueva carta fusionada (visual) usando helper centralizado.
         const fusedCardObject = this.createFieldCardAt(fusionPosition.x, fusionPosition.y, fusedCardData, { isOpponent: false, revealed: true, fieldIndex: targetIndex });
@@ -508,6 +511,7 @@ export default class GameScene extends Phaser.Scene {
                 this.socket.emit('game_event', {
                     type: 'fuse_cards',
                     actor: 'player',
+                    playerRole: this.playerRole || null,
                     sourceIndex: selIdx,
                     targetIndex: tgtIdx,
                     resultCard: fusedCardData
@@ -516,6 +520,7 @@ export default class GameScene extends Phaser.Scene {
         }
         
         this.deselectCard(false);
+        console.log('[GameScene] Carta fusionada creada en campo', { fieldIndex: targetIndex, fusedCard: fusedCardData });
         this.time.delayedCall(350, () => this.endPlayerTurn());
     }
 
@@ -528,11 +533,11 @@ export default class GameScene extends Phaser.Scene {
         // Bloquear si ya actuó o debe atacar
         if (this.gameState !== 'player-turn') return;
         if (this.playerHasActed) {
-            console.log('%c[GameScene] Ya realizaste tu acción este turno.', 'color:#ff4444');
+            console.log('[GameScene] Ya realizaste tu acción este turno.');
             return;
         }
         if (this.playerMustAttackThisTurn) {
-            console.log('%c[GameScene] Estás obligado a atacar este turno. No puedes fusionar.', 'color:#ff4444');
+            console.log('[GameScene] Estás obligado a atacar este turno. No puedes fusionar.');
             return;
         }
 
@@ -540,19 +545,19 @@ export default class GameScene extends Phaser.Scene {
         const fieldCardData = fieldCardObject.cardData;
         const targetIndex = fieldCardObject.getData('fieldIndex');
 
-        console.log(`Intento de fusionar carta de mano ${handCardData.id} con carta en campo ${fieldCardData.id}`);
+        console.log('[GameScene] Intento de fusión desde la mano', { handCardId: handCardData.id, fieldCardId: fieldCardData.id, targetIndex });
 
         // 1. Llamamos al modelo del jugador para que gestione la fusión.
         const fusionResult = this.player.fuseFromHand(handCardData.instanceId, targetIndex);
 
         // 2. Si el modelo devuelve null, la fusión no era válida (tipos/niveles no coinciden).
         if (!fusionResult) {
-            console.log('Fallo de fusión desde la mano: Las cartas no son compatibles.');
+            console.log('[GameScene] Fallo de fusión desde la mano: cartas no compatibles', { handCardId: handCardData.id, targetIndex });
             this.deselectCard(); // Deseleccionamos la carta de la mano.
             return;
         }
 
-        console.log('%cFusión desde la mano exitosa!', 'color: #00ffaa');
+        console.log('[GameScene] Fusión desde la mano realizada', { handCardId: handCardData.instanceId, targetIndex, result: fusionResult });
 
         // 3. Destruimos los objetos visuales de las cartas originales.
         const fusionPosition = { x: fieldCardObject.x, y: fieldCardObject.y };
@@ -565,6 +570,7 @@ export default class GameScene extends Phaser.Scene {
 
         // 5. Limpiamos la selección y refrescamos la mano.
         this.deselectCard(false); // Deseleccionamos sin animación.
+        console.log('[GameScene] Carta fusionada (mano->campo) creada', { fieldIndex: targetIndex, fusedCard: fusionResult });
 
         // Robamos una carta para reponer la que se usó desde la mano.
         this.player.drawCard();
@@ -581,6 +587,7 @@ export default class GameScene extends Phaser.Scene {
                 this.socket.emit('game_event', {
                     type: 'fuse_from_hand',
                     actor: 'player',
+                    playerRole: this.playerRole || null,
                     handCardId: handCardData.instanceId,
                     targetIndex: targetIndex,
                     resultCard: fusionResult
@@ -619,14 +626,14 @@ export default class GameScene extends Phaser.Scene {
 
         // 🎮 EN MODO LAN: No ejecutar IA, solo esperar acciones del oponente remoto
         if (this.isLAN) {
-            console.log('%c[LAN] Turno del oponente - Esperando su acción...', 'color: #00aaff');
+            console.log('[GameScene] Inicio del turno del OPONENTE (LAN) - esperando acción remota', { turnNumber: this.opponentTurnNumber });
             this.events.emit('update-turn-indicator', 'opponent');
             // El oponente jugará desde su cliente, los eventos llegarán por socket
             return;
         }
 
         // 🤖 MODO BOT: Ejecutar IA del oponente
-        console.log('%c[Opponent] Analizando acciones...', 'color: #ff8c00');
+        console.log('[GameScene] IA del oponente evaluando acciones (BOT)', { turnNumber: this.opponentTurnNumber });
 
         this.time.delayedCall(800, () => {
             let acted = false;
@@ -922,7 +929,7 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
         const cardData = cardObject.getData('cardData') || cardObject.cardData;
-        console.log(`%c[GameScene] Carta del jugador ${cardData.id} ha sido revelada por un ataque/fusión.`, "color: #9933ff");
+        console.log('[GameScene] Carta del jugador revelada', { cardId: cardData && cardData.id, type: cardData && cardData.type, level: cardData && cardData.level, cause: 'ataque/fusión' });
         cardObject.setData('isRevealed', true);
         // Si el objeto muestra textura de back, cambiar por la frontal
         if (cardObject.setTexture && cardData) {
@@ -948,7 +955,7 @@ export default class GameScene extends Phaser.Scene {
         // Si en dos turns previos no atacó -> ahora debe atacar
         this.playerMustAttackThisTurn = (this.playerTurnsSinceLastAttack >= 2);
 
-        console.log('%c[GameScene] Inicia el turno del jugador.', 'color: #00ccff');
+        console.log('[GameScene] Inicio del turno del JUGADOR', { turnNumber: this.playerTurnNumber, mustAttack: this.playerMustAttackThisTurn });
         this.events.emit('update-turn-indicator', 'player');
         // Emitimos el estado del contador obligatorio para que la UI lo muestre
         this.events.emit('update-attack-counter', 'player', this.playerTurnsSinceLastAttack + 1, this.playerMustAttackThisTurn);
@@ -978,7 +985,7 @@ export default class GameScene extends Phaser.Scene {
         // Si está obligado a atacar y NO tiene cartas en campo: saltar el turno y reiniciar contador.
         const playerHasFieldCards = this.player.field.some(c => c !== null);
         if (this.playerMustAttackThisTurn && !playerHasFieldCards) {
-            console.log('%c[GameScene] Obligado a atacar pero no tiene cartas -> salta turno y reinicia contador.', 'color:#ff4444');
+                console.log('[GameScene] Obligado a atacar pero no tiene cartas -> salto de turno automático', { playerTurnsSinceLastAttack: this.playerTurnsSinceLastAttack });
             this.playerTurnsSinceLastAttack = 0;
             this.deselectCard(false);
             this.time.delayedCall(80, () => this.endPlayerTurn());
@@ -988,7 +995,7 @@ export default class GameScene extends Phaser.Scene {
 
     // Nuevo helper cuando se queda sin tiempo
     _playerTimedOut() {
-        console.log('%c[GameScene] El jugador agotó el tiempo del turno.', 'color: #ff4444');
+        console.log('[GameScene] Tiempo agotado: el jugador no actuó en el turno', { turnNumber: this.playerTurnNumber });
         // Si estaba obligado a atacar y tenía cartas, se considera que NO atacó:
         // endPlayerTurn() aumentará su contador de turnos sin atacar (no lo reiniciamos).
         this.endPlayerTurn();
@@ -1000,13 +1007,13 @@ export default class GameScene extends Phaser.Scene {
     endPlayerTurn() {
         if (this.gameState !== 'player-turn') return;
 
-        console.log('%c[GameScene] Turno del jugador terminado.', 'color: #ff8c00');
+        console.log('[GameScene] Fin del turno del JUGADOR', { playerHasActed: this.playerHasActed, performedAttack: this.playerPerformedAttackThisTurn, turnNumber: this.playerTurnNumber });
 
         if (this.turnTimer) this.turnTimer.destroy();
         // Comprobamos inactividad
         if (!this.playerHasActed) {
             this.playerInactiveTurns++;
-            console.log(`%c[GameScene] El jugador ha estado inactivo. Turnos inactivos: ${this.playerInactiveTurns}`, 'color: #ff4444');
+            console.log('[GameScene] Jugador inactivo', { inactiveTurns: this.playerInactiveTurns });
         } else {
             this.playerInactiveTurns = 0; // Reseteamos si hubo acción
         }
@@ -1057,7 +1064,7 @@ export default class GameScene extends Phaser.Scene {
         // Comprobamos inactividad del oponente
         if (!opponentActed) {
             this.opponentInactiveTurns++;
-            console.log(`%c[GameScene] El oponente ha estado inactivo. Turnos inactivos: ${this.opponentInactiveTurns}`, 'color: #ff4444');
+            console.log('[GameScene] Oponente inactivo', { inactiveTurns: this.opponentInactiveTurns });
         } else {
             this.opponentInactiveTurns = 0;
         }
@@ -1110,14 +1117,14 @@ export default class GameScene extends Phaser.Scene {
     handleAttack(attackingCardObject, defendingCardObject) {
         if (this.gameState !== 'player-turn') return;
         if (this.playerHasActed) {
-            console.log('%c[GameScene] Ya realizaste tu acción este turno.', 'color:#ff4444');
+            console.log('[GameScene] Ya realizaste tu acción este turno.');
             return;
         }
 
         // Restricción por nivel: comprobar blockedTurn en lugar de solo cooldown
         const blocked = attackingCardObject.getData('blockedTurn');
         if (blocked === this.playerTurnNumber) {
-            console.log('%c[GameScene] Esta carta está descansando este turno (restricción por nivel).', 'color:#ff4444');
+            console.log('[GameScene] Esta carta está descansando este turno (restricción por nivel).');
             return;
         }
 
@@ -1129,7 +1136,7 @@ export default class GameScene extends Phaser.Scene {
         this.playerPerformedAttackThisTurn = true;
         this.playerTurnsSinceLastAttack = 0; // Reiniciamos contador de ataques
 
-        console.log(`%c[GameScene] Jugador ataca con ${attackerData.type} a ${defenderData.type}`, "color: #ff69b4");
+        console.log('[GameScene] Jugador realiza ataque', { attackerType: attackerData.type, defenderType: defenderData.type, attackerIndex: attackingCardObject.getData('fieldIndex'), defenderIndex: defendingCardObject.getData('fieldIndex') });
 
         // Revelamos ambos según regla 14
         this.revealPlayerCard(attackingCardObject);
@@ -1137,7 +1144,7 @@ export default class GameScene extends Phaser.Scene {
 
         // Resolvemos el combate
         const result = resolveCombat(attackerData, defenderData);
-        console.log('Resultado del combate:', result);
+        console.log('[GameScene] Resultado del combate', result);
 
         // Registrar cooldowns / consecutiveAttacks
         this._registerCardAttack(attackingCardObject, 'player');
@@ -1148,6 +1155,7 @@ export default class GameScene extends Phaser.Scene {
                 this.socket.emit('game_event', {
                     type: 'attack',
                     actor: 'player',
+                    playerRole: this.playerRole || null,
                     attackerIndex: attackingCardObject.getData('fieldIndex'),
                     defenderIndex: defendingCardObject.getData('fieldIndex'),
                     result: result
@@ -1165,13 +1173,13 @@ export default class GameScene extends Phaser.Scene {
     handleDirectAttack(attackingCardObject) {
         if (this.gameState !== 'player-turn') return;
         if (this.playerHasActed) {
-            console.log('%c[GameScene] Ya realizaste tu acción este turno.', 'color:#ff4444');
+            console.log('[GameScene] Ya realizaste tu acción este turno.');
             return;
         }
 
         const blocked = attackingCardObject.getData('blockedTurn');
         if (blocked === this.playerTurnNumber) {
-            console.log('%c[GameScene] Esta carta está descansando este turno (restricción por nivel).', 'color:#ff4444');
+            console.log('[GameScene] Esta carta está descansando este turno (restricción por nivel).');
             return;
         }
 
@@ -1180,7 +1188,7 @@ export default class GameScene extends Phaser.Scene {
         this.playerPerformedAttackThisTurn = true;
         this.playerTurnsSinceLastAttack = 0;
 
-        console.log(`%c[GameScene] Jugador realiza un ATAQUE DIRECTO con ${attackerData.type}`, "color: #ff69b4");
+        console.log('[GameScene] Jugador realiza ataque directo', { attackerType: attackerData.type, attackerIndex: attackingCardObject.getData('fieldIndex') });
 
         // Llenamos la esencia del jugador
         this.player.fillEssence(attackerData.type);
@@ -1197,6 +1205,7 @@ export default class GameScene extends Phaser.Scene {
                 this.socket.emit('game_event', {
                     type: 'direct_attack',
                     actor: 'player',
+                    playerRole: this.playerRole || null,
                     attackerIndex: attackingCardObject.getData('fieldIndex'),
                     essenceType: attackerData.type
                 });
@@ -1220,10 +1229,26 @@ export default class GameScene extends Phaser.Scene {
                 this.deselectCard(true); // asegurar que vuelva a startPosition tras el ataque
                 // Después de una breve pausa para que se vea el resultado, aplicamos el daño.
                 this.time.delayedCall(250, () => {
+                    console.log('[GameScene] animateAttack local complete, result:', result, { attackerFieldIndex: attackingCardObject.getData('fieldIndex'), target });
+                    // Determinar owner del atacante según metadata visual
+                    const attackerIsOpponent = !!attackingCardObject.getData('isOpponentCard');
+                    const attackerOwner = attackerIsOpponent ? this.opponent : this.player;
+                    // Si el target es un objeto visual de carta, determinar su owner
+                    let defenderOwner = null;
+                    let defenderFieldIndex = null;
+                    if (target && typeof target.getData === 'function') {
+                        const defenderIsOpponent = !!target.getData('isOpponentCard');
+                        defenderOwner = defenderIsOpponent ? this.opponent : this.player;
+                        defenderFieldIndex = target.getData('fieldIndex');
+                    }
+
                     if (result.loser === 'attacker') {
-                        this.destroyCard(this.player, attackingCardObject.getData('fieldIndex'));
-                    } else if (result.loser === 'defender' && target && typeof target.getData === 'function') {
-                        this.destroyCard(this.opponent, target.getData('fieldIndex'));
+                        const idx = attackingCardObject.getData('fieldIndex');
+                        console.log('[GameScene] animateAttack: destruyendo atacante', { owner: attackerOwner.id, idx });
+                        this.destroyCard(attackerOwner, idx);
+                    } else if (result.loser === 'defender' && defenderOwner && typeof defenderFieldIndex === 'number') {
+                        console.log('[GameScene] animateAttack: destruyendo defensor', { owner: defenderOwner.id, idx: defenderFieldIndex });
+                        this.destroyCard(defenderOwner, defenderFieldIndex);
                     }
 
                     // Tras el ataque, el turno del jugador termina automáticamente
@@ -1240,33 +1265,33 @@ export default class GameScene extends Phaser.Scene {
     checkVictoryConditions() {
         // Condición 1: Derrota por inactividad
         if (this.playerInactiveTurns >= 3) {
-            console.log('%c[GameScene] VICTORIA para el OPONENTE por inactividad del jugador.', 'color: #ff0000');
+            console.log('[GameScene] VICTORIA: OPONENTE (inactividad del jugador)');
             return 'opponent';
         }
         if (this.opponentInactiveTurns >= 3) {
-            console.log('%c[GameScene] VICTORIA para el JUGADOR por inactividad del oponente.', 'color: #00ff00');
+            console.log('[GameScene] VICTORIA: JUGADOR (inactividad del oponente)');
             return 'player';
         }
 
         // Condición 2: Victoria por control de campo (6 tipos únicos)
         const playerFieldTypes = new Set(this.player.field.filter(c => c).map(c => c.type));
         if (playerFieldTypes.size === 6) {
-            console.log('%c[GameScene] VICTORIA para el JUGADOR por control de campo (6 tipos).', 'color: #00ff00');
+            console.log('[GameScene] VICTORIA: JUGADOR (control de campo - 6 tipos)');
             return 'player';
         }
         const opponentFieldTypes = new Set(this.opponent.field.filter(c => c).map(c => c.type));
         if (opponentFieldTypes.size === 6) {
-            console.log('%c[GameScene] VICTORIA para el OPONENTE por control de campo (6 tipos).', 'color: #ff0000');
+            console.log('[GameScene] VICTORIA: OPONENTE (control de campo - 6 tipos)');
             return 'opponent';
         }
 
         // Condición 3: Victoria por llenar las 6 esencias
         if (this.player.essences.size === 6) {
-            console.log('%c[GameScene] VICTORIA para el JUGADOR por llenar las 6 esencias.', 'color: #00ff00');
+            console.log('[GameScene] VICTORIA: JUGADOR (llenó las 6 esencias)');
             return 'player';
         }
         if (this.opponent.essences.size === 6) {
-            console.log('%c[GameScene] VICTORIA para el OPONENTE por llenar las 6 esencias.', 'color: #ff0000');
+            console.log('[GameScene] VICTORIA: OPONENTE (llenó las 6 esencias)');
             return 'opponent';
         }
 
@@ -1283,7 +1308,7 @@ export default class GameScene extends Phaser.Scene {
         this.events.emit('update-timer', 0); // Limpia el contador en la UI
         // No hay botón de terminar turno ahora.
 
-        console.log(`%c[GameScene] Fin de la partida. Ganador: ${winner}`, 'color: yellow; font-size: 18px;');
+        console.log('[GameScene] Fin de la partida. Ganador:', winner);
 
         // Desactivamos toda la interactividad para que no se pueda seguir jugando.
         this.input.enabled = false;
@@ -1320,6 +1345,19 @@ export default class GameScene extends Phaser.Scene {
             });
         }
 
+        // Determinar instanceId definitivo (modelo o argumento)
+        const modelInstanceId = cardData && cardData.instanceId;
+        const finalInstanceId = instanceId || modelInstanceId || (cardObject && cardObject.getData && cardObject.getData('cardData') && cardObject.getData('cardData').instanceId) || null;
+
+        // Idempotencia: si ya está en proceso de destrucción, ignorar
+        if (finalInstanceId) {
+            if (!this._pendingDestroys) this._pendingDestroys = new Set();
+            if (this._pendingDestroys.has(finalInstanceId)) {
+                console.log('[GameScene] destroyCard: ya en proceso de destrucción, se ignora petición duplicada', { instanceId: finalInstanceId });
+                return;
+            }
+        }
+
         // Si no encontramos por instanceId, buscar por índice/propiedad owner
         if (!cardObject && typeof fieldIndex === 'number') {
             cardObject = this.children.list.find(child =>
@@ -1350,6 +1388,9 @@ export default class GameScene extends Phaser.Scene {
         // Si tenemos modelo pero no objeto visual, intentar borrar solo modelo
         if (cardData && !cardObject) {
             console.warn('[GameScene] destroyCard: objeto visual no encontrado. Actualizando solamente el modelo.', { owner: owner.id, fieldIndex, cardData });
+            // Marcar como en proceso para evitar reentradas
+            if (finalInstanceId) this._pendingDestroys.add(finalInstanceId);
+
             // llevar carta(s) al cementerio según nivel
             if (cardData.level === 2) {
                 owner.addCardDataToGraveyard({ ...cardData, level: 1, id: `${cardData.type}-l1` });
@@ -1361,11 +1402,63 @@ export default class GameScene extends Phaser.Scene {
             if (typeof fieldIndex === 'number') owner.field[fieldIndex] = null;
             if (owner.id === 'player') this.refreshPlayerHand();
             this.updateDeckCounts();
+
+            if (finalInstanceId) this._pendingDestroys.delete(finalInstanceId);
             return;
         }
 
+        // Variables de coordinación para la destrucción (visuales y modelo)
+        let visualDestroyed = false;
+        let modelCleaned = false;
+
+        const finalizePending = () => {
+            if (finalInstanceId) {
+                this._pendingDestroys.delete(finalInstanceId);
+                console.log('[GameScene] destroyCard: limpieza pending completa', { instanceId: finalInstanceId });
+            }
+        };
+
+        const tryFinalize = () => {
+            if (visualDestroyed && modelCleaned) finalizePending();
+        };
+
         // Destrucción visual con animación si existe
         if (cardObject) {
+            // Marcar como en proceso antes de iniciar la animación
+            if (finalInstanceId) this._pendingDestroys.add(finalInstanceId);
+            // Verificar coherencia entre owner y metadata del objeto visual
+            try {
+                const objIsOpponent = !!cardObject.getData('isOpponentCard');
+                const ownerShouldBeOpponent = owner.id === 'opponent';
+                if (objIsOpponent !== ownerShouldBeOpponent) {
+                    console.warn('[GameScene] destroyCard: mismatch owner vs visual metadata. Intentando localizar objeto correcto.', { owner: owner.id, fieldIndex, objIsOpponent });
+                    // Intentar localizar visual correcto por instanceId si existe
+                    const cd = (cardObject.getData && cardObject.getData('cardData')) || cardObject.cardData;
+                    const instanceToFind = (cd && cd.instanceId) || instanceId;
+                    if (instanceToFind) {
+                        const corrected = this.children.list.find(child => {
+                            const ccd = (child.getData && child.getData('cardData')) || child.cardData;
+                            if (!ccd || !ccd.instanceId) return false;
+                            const ownerMatch = (owner.id === 'player') ? child.getData('isCardOnField') && !child.getData('isOpponentCard') : child.getData('isOpponentCard') && child.getData('isCardOnField');
+                            return ccd.instanceId === instanceToFind && ownerMatch;
+                        });
+                        if (corrected) {
+                            console.log('[GameScene] destroyCard: encontrado objeto corregido por instanceId.', { name: corrected.name, fieldIndex: corrected.getData('fieldIndex') });
+                            cardObject = corrected;
+                        } else {
+                            // Intentar encontrar flipping owner (maybe owner arg was inverted)
+                            const flippedOwner = owner.id === 'player' ? this.opponent : this.player;
+                            const flippedObj = this.children.list.find(child => child.getData && child.getData('fieldIndex') === fieldIndex && ((flippedOwner.id === 'player' && !child.getData('isOpponentCard')) || (flippedOwner.id === 'opponent' && child.getData('isOpponentCard'))));
+                            if (flippedObj) {
+                                console.log('[GameScene] destroyCard: encontrado objeto en flipped owner, corrigiendo owner.', { flippedOwner: flippedOwner.id, foundName: flippedObj.name });
+                                owner = flippedOwner;
+                                cardObject = flippedObj;
+                            }
+                        }
+                    }
+                }
+            } catch (e) { /* ignore metadata check errors */ }
+
             console.log('[GameScene] destroyCard: animando destrucción visual', { owner: owner.id, fieldIndex, instanceId: instanceId || (cardObject.getData && cardObject.getData('cardData') && cardObject.getData('cardData').instanceId) });
             this.tweens.add({
                 targets: cardObject,
@@ -1375,6 +1468,8 @@ export default class GameScene extends Phaser.Scene {
                 onComplete: () => {
                     console.log('[GameScene] destroyCard: destroy() llamado sobre objeto visual', { name: cardObject.name, fieldIndex });
                     if (cardObject && cardObject.destroy) cardObject.destroy();
+                    visualDestroyed = true;
+                    tryFinalize();
                 }
             });
         }
@@ -1390,13 +1485,18 @@ export default class GameScene extends Phaser.Scene {
             if (typeof fieldIndex === 'number') {
                 console.log('[GameScene] destroyCard: limpiando modelo (owner.field) en slot', fieldIndex, 'valor previo:', owner.field[fieldIndex]);
                 owner.field[fieldIndex] = null;
+                modelCleaned = true;
+                tryFinalize();
             }
         }
 
         // Restaurar interactividad del slot si era del jugador
         if (owner.id === 'player' && typeof fieldIndex === 'number') {
             const slot = this['player_battle_slots'][fieldIndex];
-            if (slot) slot.setInteractive();
+            if (slot) {
+                // Asegurarnos de restaurar como dropZone para permitir jugar cartas en él
+                try { slot.setInteractive({ dropZone: true }); } catch (e) { slot.setInteractive(); }
+            }
             this.refreshPlayerHand();
         }
 
@@ -1688,13 +1788,28 @@ export default class GameScene extends Phaser.Scene {
      */
     handleRemoteGameEvent(payload) {
         if (!payload || !payload.type) return;
-        
-        // El actor 'player' del emisor es 'opponent' para el receptor
-        const isRemotePlayer = payload.actor === 'player';
+
+        // Determinar si el actor del payload es el jugador remoto.
+        // Si el emisor incluye `playerRole`, úsalo para comparar contra nuestro `this.playerRole`.
+        let isRemotePlayer = false;
+        if (payload.playerRole) {
+            // Si el role enviado difiere del nuestro, el actor es remoto para este cliente.
+            isRemotePlayer = payload.playerRole !== this.playerRole;
+        } else {
+            // Fallback histórico: actor === 'player' sigue interpretándose como acción del jugador remoto.
+            isRemotePlayer = payload.actor === 'player';
+        }
+
+        // Si el emisor incluyó su playerRole y coincide con el nuestro, es nuestro propio evento (eco del servidor) -> ignorar.
+        if (payload.playerRole && payload.playerRole === this.playerRole) {
+            console.log('[GameScene] Ignorando evento propio eco del servidor:', payload.type, payload);
+            return;
+        }
+
         const targetModel = isRemotePlayer ? this.opponent : this.player;
         const targetSlotsName = isRemotePlayer ? 'opponent_battle_slots' : 'player_battle_slots';
-        
-        console.log('%c[GameScene] Evento remoto recibido:', 'color: #00aaff', payload.type);
+
+        console.log('[GameScene] Evento remoto recibido', { type: payload.type, payload, isRemotePlayer, myRole: this.playerRole });
         
         // Marcar que el oponente ha actuado (solo si es su turno y es una acción del oponente remoto)
         const isOpponentAction = isRemotePlayer && this.gameState === 'opponent-turn';
@@ -1715,6 +1830,7 @@ export default class GameScene extends Phaser.Scene {
                 const slot = this[targetSlotsName] && this[targetSlotsName][fieldIndex];
                 if (slot) {
                     const oppCard = this.createFieldCard(slot, card, { isOpponent: isRemotePlayer, revealed: false, fieldIndex });
+                    console.log('[GameScene] Carta colocada por remoto', { actor: payload.actor || (isRemotePlayer ? 'opponent' : 'player'), playerRole: payload.playerRole || null, cardId: card.id, instanceId: card.instanceId, type: card.type, level: card.level, fieldIndex });
                 }
                 
                 // En LAN, marcar que el oponente actuó
@@ -1746,6 +1862,7 @@ export default class GameScene extends Phaser.Scene {
                 if (slot) {
                     const fusedObj = this.createFieldCard(slot, resultCard, { isOpponent: true, revealed: true, fieldIndex: targetIndex });
                     try { fusedObj.setTexture(`card-${resultCard.type}-${resultCard.level}`); } catch (e) {}
+                    console.log('[GameScene] Fusión remota en campo', { sourceIndex, targetIndex, resultCard });
                 }
                 
                 // En LAN, marcar que el oponente actuó
@@ -1775,6 +1892,7 @@ export default class GameScene extends Phaser.Scene {
                 if (slot) {
                     const fusedObj = this.createFieldCard(slot, resultCard, { isOpponent: true, revealed: true, fieldIndex: targetIndex });
                     try { fusedObj.setTexture(`card-${resultCard.type}-${resultCard.level}`); } catch (e) {}
+                    console.log('[GameScene] Fusión remota desde mano', { targetIndex, resultCard });
                 }
                 
                 // Actualizar mano del oponente
@@ -1805,15 +1923,23 @@ export default class GameScene extends Phaser.Scene {
                 );
                 
                 if (!attackerObj || !defenderObj) {
-                    console.warn('No se encontraron las cartas para el ataque remoto');
+                    console.warn('No se encontraron las cartas para el ataque remoto', { attackerIndex, defenderIndex, isRemotePlayer });
                     break;
                 }
                 
-                // Revelar atacante
+                // Revelar atacante/defensor (mapeo local ya aplicado: attackerObj es la carta del actor remoto)
                 this.revealOpponentCard(attackerObj);
                 this.revealPlayerCard(defenderObj);
-                
-                // Animar ataque
+
+                // En LAN, marcar que el oponente actuó y realizó ataque INMEDIATAMENTE
+                if (isOpponentAction) {
+                    this.opponentHasActed = true;
+                    this.opponentPerformedAttackThisTurn = true;
+                }
+
+                console.log('[GameScene] Ataque remoto - animando', { attackerIndex, defenderIndex, result, isRemotePlayer });
+
+                // Animar ataque y aplicar resultado. Determinar owner real desde objetos visuales
                 this.tweens.add({
                     targets: attackerObj,
                     x: defenderObj.x,
@@ -1822,17 +1948,20 @@ export default class GameScene extends Phaser.Scene {
                     yoyo: true,
                     ease: 'Power1',
                     onComplete: () => {
-                        // Aplicar resultado
+                        console.log('[GameScene] Ataque remoto complete, aplicando resultado:', result);
+                        // Determinar owner y fieldIndex reales según los objetos encontrados
                         if (result.loser === 'attacker') {
-                            this.destroyCard(this.opponent, attackerIndex);
+                            const ownerIsOpponent = !!attackerObj.getData('isOpponentCard');
+                            const owner = ownerIsOpponent ? this.opponent : this.player;
+                            const idx = attackerObj.getData('fieldIndex');
+                            console.log('[GameScene] Resultado indica atacante perdió; destruyendo objeto encontrado', { owner: owner.id, idx, ownerIsOpponent });
+                            this.destroyCard(owner, idx);
                         } else if (result.loser === 'defender') {
-                            this.destroyCard(this.player, defenderIndex);
-                        }
-                        
-                        // En LAN, marcar que el oponente actuó y realizó ataque
-                        if (isOpponentAction) {
-                            this.opponentHasActed = true;
-                            this.opponentPerformedAttackThisTurn = true;
+                            const ownerIsOpponent = !!defenderObj.getData('isOpponentCard');
+                            const owner = ownerIsOpponent ? this.opponent : this.player;
+                            const idx = defenderObj.getData('fieldIndex');
+                            console.log('[GameScene] Resultado indica defensor perdió; destruyendo objeto encontrado', { owner: owner.id, idx, ownerIsOpponent });
+                            this.destroyCard(owner, idx);
                         }
                     }
                 });
@@ -1895,7 +2024,7 @@ export default class GameScene extends Phaser.Scene {
         const cardData = cardObject.getData('cardData');
         const textureName = `card-${cardData.type}-${cardData.level}`;
 
-        console.log(`%c[GameScene] Revelando carta del oponente: ${cardData.id}`, "color: #9933ff");
+        console.log('[GameScene] Revelando carta del oponente', { cardId: cardData.id, type: cardData.type, level: cardData.level });
 
         // Marcamos la carta como revelada para no volver a hacerlo.
         cardObject.setData('isRevealed', true);

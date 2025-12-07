@@ -15,7 +15,7 @@ export default class UIScene extends Phaser.Scene {
 
     preload() {
         // Cargamos aquí los assets de la UI para mantener el código organizado
-        console.log("%c[UIScene] Cargando assets de UI...", "color: #00ff00");
+        console.log('[UIScene] Cargando assets de UI...');
         this.load.image('orb-fuego', '/assets/images/iconos/fuego.png');
         this.load.image('orb-agua', '/assets/images/iconos/agua.png');
         this.load.image('orb-planta', '/assets/images/iconos/planta.png');
@@ -25,7 +25,7 @@ export default class UIScene extends Phaser.Scene {
     }
 
     create(data) {
-        console.log("%c[UIScene] Creada.", "color: #00ff00");
+        console.log('[UIScene] Creada', { player: this.playerData?.username || 'Jugador' });
         this.playerData = data.playerData || { username: 'Jugador' }; // Fallback por si no hay datos
         const username = this.playerData.username;
 
@@ -422,7 +422,7 @@ export default class UIScene extends Phaser.Scene {
      * @param {string} essenceType El tipo de esencia activada (ej. 'fuego')
      */
     handleEssenceActivation(playerId, essenceType) {
-        console.log(`%c[UIScene] Recibido evento: Activar esencia ${essenceType} para ${playerId}`, "color: #00ff00");
+        console.log('[UIScene] Recibido evento: activar esencia', { essenceType, playerId });
 
         let targetOrb;
         if (playerId === 'player') {

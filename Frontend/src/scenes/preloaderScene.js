@@ -11,7 +11,7 @@ export default class PreloaderScene extends Phaser.Scene {
      * NO creamos objetos visuales aquí (imágenes, texto, etc.).
      */
     preload() {
-        console.log("%c[PreloaderScene] Cargando assets del juego...", "color: #00aaff");
+        console.log('[PreloaderScene] Cargando assets del juego...');
 
         // Mostramos la barra de progreso que crearemos en `create`.
         this.createLoadingBar();
@@ -38,7 +38,7 @@ export default class PreloaderScene extends Phaser.Scene {
         // El evento 'complete' nos avisa cuando todo en preload() ha terminado.
         // Es el lugar correcto para iniciar la siguiente escena.
         this.load.on("complete", () => {
-            console.log("%c[PreloaderScene] Carga completa.", "color: #7dff6b");
+            console.log('[PreloaderScene] Carga completa.');
             // La animación de fade out dará una transición suave.
             this.cameras.main.fadeOut(500, 0, 0, 0);
             this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
