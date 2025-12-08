@@ -10,8 +10,8 @@ const connectDB = async () => {
   }
 
   try {
-    // Agregado el log para verificar la URL de conexión
-    console.log(`Intentando conectar a la base de datos: ${process.env.DATABASE_URL}`);
+    // Verifica las credenciales de la DB y la configuración SSL
+    console.log(`Conectando a la base de datos en host: ${process.env.DB_HOST}`);
 
     const sequelize = new Sequelize(
       process.env.DB_NAME,
@@ -24,8 +24,8 @@ const connectDB = async () => {
         logging: false,
         dialectOptions: {
           ssl: {
-            require: true,
-            rejectUnauthorized: false, // 🔑 Importante para Render
+            require: true,  // Esto asegura que la conexión es SSL
+            rejectUnauthorized: false, // Esto permite que se acepte el certificado auto-firmado de Render
           },
         },
       }
