@@ -5,7 +5,7 @@ const http = require('http');
 const cors = require('cors');
 
 // Importar módulos
-const connectDB = require('./config/db');
+const db = require('./config/db'); // ahora importamos el objeto
 const socketManager = require('./socketManager');
 const { displayNetworkInfo } = require('./show-network-info');
 
@@ -14,7 +14,21 @@ const PORT = process.env.PORT || 3001;
 
 const startServer = async () => {
     // Conectar a la base de datos
-    const sequelize = await connectDB();
+    let sequelize;
+    try {
+        if (typeof db.connectDB === 'function') {
+            sequelize = await db.connectDB();
+        } else if (db.sequelize) {
+            sequelize = db.sequelize;
+            await sequelize.authenticate();
+            console.log('DB conectado y SSL:', !!process.env.DB_REQUIRE_SSL);
+        } else {
+            console.log('No hay configuración de base de datos disponible');
+        }
+    } catch (err) {
+        console.error('No se pudo conectar a la BD:', err.message || err);
+        sequelize = null;
+    }
 
     // Middleware
     app.use(cors());
@@ -49,11 +63,6 @@ const startServer = async () => {
     server.listen(PORT, '0.0.0.0', () => {
         displayNetworkInfo(PORT);
     });
-
-    // Comprobar conexión a la base de datos
-    sequelize.authenticate()
-        .then(() => console.log('DB conectado y SSL:', !!process.env.DB_REQUIRE_SSL))
-        .catch(err => console.error('DB error:', err));
 };
 
 // Iniciar servidor

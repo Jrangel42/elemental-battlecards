@@ -5,28 +5,42 @@ const useSqlite = (process.env.DB_USE_SQLITE || 'false').toLowerCase() === 'true
 let sequelize;
 
 if (useSqlite) {
-  sequelize = new Sequelize({
-    dialect: 'sqlite',
-    storage: ':memory:',
-    logging: false
-  });
+    sequelize = new Sequelize({
+        dialect: 'sqlite',
+        storage: ':memory:',
+        logging: false,
+    });
 } else {
-  const requireSSL = ((process.env.DB_REQUIRE_SSL || 'true').toString().toLowerCase() === 'true');
-  const dialectOptions = requireSSL ? { ssl: { require: true, rejectUnauthorized: false } } : undefined;
+    const requireSSL = ((process.env.DB_REQUIRE_SSL || 'true').toString().toLowerCase() === 'true');
 
-  const host = process.env.DB_HOST || '127.0.0.1';
-  const port = process.env.DB_PORT || 5432;
-  const database = process.env.DB_NAME || 'elemental';
-  const username = process.env.DB_USER || 'postgres';
-  const password = process.env.DB_PASS || 'password';
+    const dialectOptions = requireSSL
+        ? { ssl: { require: true, rejectUnauthorized: false } }
+        : undefined;
 
-  sequelize = new Sequelize(database, username, password, {
-    host,
-    port,
-    dialect: 'postgres',
-    logging: false,
-    dialectOptions
-  });
+    const host = process.env.DB_HOST || '127.0.0.1';
+    const port = process.env.DB_PORT || 5432;
+    const database = process.env.DB_NAME || 'elemental';
+    const username = process.env.DB_USER || 'postgres';
+    const password = process.env.DB_PASS || 'password';
+
+    sequelize = new Sequelize(database, username, password, {
+        host,
+        port,
+        dialect: 'postgres',
+        logging: false,
+        dialectOptions,
+    });
 }
 
-module.exports = { sequelize, Sequelize };
+async function connectDB() {
+    try {
+        await sequelize.authenticate();
+        console.log('DB conectado (connectDB) y SSL:', !!process.env.DB_REQUIRE_SSL);
+        return sequelize;
+    } catch (error) {
+        console.error('Error conectando a DB (connectDB):', error);
+        throw error;
+    }
+}
+
+module.exports = { sequelize, Sequelize, connectDB };
