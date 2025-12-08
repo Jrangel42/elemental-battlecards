@@ -10,6 +10,9 @@ const connectDB = async () => {
   }
 
   try {
+    // Agregado el log para verificar la URL de conexión
+    console.log(`Intentando conectar a la base de datos: ${process.env.DATABASE_URL}`);
+
     const sequelize = new Sequelize(
       process.env.DB_NAME,
       process.env.DB_USER,
