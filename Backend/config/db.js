@@ -1,5 +1,5 @@
 const { Sequelize } = require('sequelize');
-const config = require('./config/config.js'); // Asegúrate de que esta ruta sea correcta
+const config = require('./config.js');
 
 const connectDB = async () => {
   const dbEnabled = (process.env.DB_ENABLED || 'false').toLowerCase() === 'true';
