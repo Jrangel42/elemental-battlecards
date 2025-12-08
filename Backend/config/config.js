@@ -1,4 +1,4 @@
-require('dotenv').config(); // Esto carga las variables de entorno desde el archivo .env
+require('dotenv').config(); // Cargar las variables de entorno desde el archivo .env
 
 const fs = require('fs');
 const path = require('path');
