@@ -13,7 +13,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Conectar a la base de datos
-connectDB();
+const sequelize = connectDB();
 
 // Middleware
 app.use(cors());

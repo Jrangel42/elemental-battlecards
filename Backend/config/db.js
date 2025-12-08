@@ -6,7 +6,7 @@ const connectDB = async () => {
 
   if (!dbEnabled) {
     console.log('Base de datos deshabilitada. Servidor funcionando solo para juego en LAN.');
-    return;
+    return null;
   }
 
   try {
@@ -22,9 +22,9 @@ const connectDB = async () => {
         dialectOptions: {
           ssl: {
             require: true,
-            rejectUnauthorized: false
-          }
-        }
+            rejectUnauthorized: false, // 🔑 Importante para Render
+          },
+        },
       }
     );
 
@@ -37,6 +37,7 @@ const connectDB = async () => {
     console.error("❌ Error conectando a la base de datos:", err.message);
     console.error("Revisa variables DB_* en .env");
     console.error("El servidor continuará sin DB para juego LAN.");
+    return null;
   }
 };
 
