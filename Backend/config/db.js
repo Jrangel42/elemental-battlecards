@@ -1,5 +1,5 @@
 const { Sequelize } = require('sequelize');
-const config = require('./config.js'); // Aquí importas config.js
+const config = require('./config/config.js'); // Asegúrate de que esta ruta sea correcta
 
 const connectDB = async () => {
   const dbEnabled = (process.env.DB_ENABLED || 'false').toLowerCase() === 'true';
@@ -21,8 +21,8 @@ const connectDB = async () => {
       logging: false,
       dialectOptions: {
         ssl: {
-          require: true,  // Esto asegura que la conexión es SSL
-          rejectUnauthorized: false, // Esto permite que se acepte el certificado auto-firmado de Render
+          require: true,  // Esto asegura que la conexión sea SSL
+          rejectUnauthorized: false, // Permite certificados auto-firmados (como los de Render)
         },
       },
     });
