@@ -49,6 +49,11 @@ const startServer = async () => {
     server.listen(PORT, '0.0.0.0', () => {
         displayNetworkInfo(PORT);
     });
+
+    // Comprobar conexión a la base de datos
+    sequelize.authenticate()
+        .then(() => console.log('DB conectado y SSL:', !!process.env.DB_REQUIRE_SSL))
+        .catch(err => console.error('DB error:', err));
 };
 
 // Iniciar servidor
