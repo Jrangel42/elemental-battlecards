@@ -1,5 +1,5 @@
 const { Sequelize } = require('sequelize');
-const config = require('./config/dbConfig'); // Aquí importas dbConfig.js
+const config = require('./config/config.js'); // Aquí importas config.js
 
 const connectDB = async () => {
   const dbEnabled = (process.env.DB_ENABLED || 'false').toLowerCase() === 'true';
