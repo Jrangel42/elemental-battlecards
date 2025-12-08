@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 
 // URL del backend real
-const scriptURL = "https://TU_BACKEND_URL.onrender.com/api/auth/login";
+const scriptURL = "https://elemental-battlecards.onrender.com/api/auth/login";
 
 export default class LoginScene extends Phaser.Scene {
     constructor() {
