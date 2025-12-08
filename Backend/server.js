@@ -12,14 +12,14 @@ const { displayNetworkInfo } = require('./show-network-info');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Conectar a la base de datos (opcional)
+// Conectar a la base de datos
 connectDB();
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
 
-// Rutas de autenticación (solo si la DB está habilitada)
+// Rutas de autenticación
 const dbEnabled = (process.env.DB_ENABLED || 'false').toLowerCase() === 'true';
 if (dbEnabled) {
   try {
@@ -38,30 +38,10 @@ app.get('/ping', (req, res) => {
     res.json({ ok: true, time: Date.now(), host: req.hostname });
 });
 
-// Debug endpoint para ver salas activas
-app.get('/rooms', (req, res) => {
-    const roomsInfo = {};
-    if (global.activeRooms) {
-        Object.keys(global.activeRooms).forEach(code => {
-            const room = global.activeRooms[code];
-            roomsInfo[code] = {
-                players: room.players.length,
-                playerIds: room.players.map(p => p.socketId)
-            };
-        });
-    }
-    res.json({ rooms: roomsInfo, totalRooms: Object.keys(roomsInfo).length });
-});
-
+// Crear el servidor y inicializar socket.io
 const server = http.createServer(app);
-
-// Inicializar socket.io
 const { Server } = require('socket.io');
-const io = new Server(server, {
-    cors: {
-        origin: '*'
-    }
-});
+const io = new Server(server, { cors: { origin: '*' } });
 
 socketManager(io);
 

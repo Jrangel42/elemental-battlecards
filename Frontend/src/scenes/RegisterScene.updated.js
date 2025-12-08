@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
-// Versión actualizada: envía FormData al Apps Script desde el botón
-const scriptURL = "https://script.google.com/macros/s/AKfycbxYudPQa4QPGn62sIdQhQ7XlgI_WU1-zfupR1cmUn0-SoUaoJpWVV_S8mkTfHjYiln1tQ/exec";
+
+// URL del backend real
+const scriptURL = "https://TU_BACKEND_URL.onrender.com/api/auth/register";
 
 export default class RegisterSceneUpdated extends Phaser.Scene {
     constructor() {
@@ -91,7 +92,7 @@ export default class RegisterSceneUpdated extends Phaser.Scene {
             </form>
         `;
 
-        this.formElement = this.add.dom(width/2, height/2).createFromHTML(formHTML);
+        this.formElement = this.add.dom(width / 2, height / 2).createFromHTML(formHTML);
 
         const btn = this.formElement.node.querySelector('.btn-primary');
         btn.addEventListener('click', async () => {
@@ -103,28 +104,31 @@ export default class RegisterSceneUpdated extends Phaser.Scene {
             if (password !== passwordConfirm) { alert('Las contraseñas no coinciden.'); return; }
             if (!username || !email || !password) { alert('Completa todos los campos.'); return; }
 
-            btn.disabled = true; btn.textContent = 'Creando...';
-            const form = new FormData();
-            form.append('username', username);
-            form.append('email', email);
-            form.append('password', password);
+            btn.disabled = true;
+            btn.textContent = 'Creando...';
 
             try {
-                const res = await fetch(scriptURL, { method: 'POST', body: form });
-                const text = await res.text();
-                let json = null;
-                try { json = JSON.parse(text); } catch(e){}
-                if (res.ok && ((json && json.status==='success') || /success/i.test(text))) {
+                const res = await fetch(scriptURL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+
+                const json = await res.json();
+
+                if (res.ok) {
                     alert('Registro exitoso');
                     this.scene.start('LoginScene');
                     return;
                 }
-                alert('Error al registrar: ' + (json && json.message ? json.message : text));
+
+                alert('Error al registrar: ' + (json.message || 'Verifica los datos'));
             } catch (err) {
-                console.error(err);
+                console.error('Error de conexión/register', err);
                 alert('Error de conexión');
             } finally {
-                btn.disabled = false; btn.textContent = 'Crear cuenta';
+                btn.disabled = false;
+                btn.textContent = 'Crear cuenta';
             }
         });
 
@@ -132,5 +136,10 @@ export default class RegisterSceneUpdated extends Phaser.Scene {
         loginLink.addEventListener('click', (e) => { e.preventDefault(); this.scene.start('LoginScene'); });
     }
 
-    resize(gameSize) { const { width, height } = gameSize; this.bg.displayWidth = width; this.bg.displayHeight = height; this.formElement.setPosition(width/2, height/2); }
+    resize(gameSize) {
+        const { width, height } = gameSize;
+        this.bg.displayWidth = width;
+        this.bg.displayHeight = height;
+        this.formElement.setPosition(width / 2, height / 2);
+    }
 }

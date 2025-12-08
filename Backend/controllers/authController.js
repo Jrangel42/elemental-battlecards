@@ -1,13 +1,11 @@
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { User } = require('../models'); // Sequelize models via models/index.js
+const { User } = require('../models'); // Sequelize models
 
-const JWT_SECRET = process.env.JWT_SECRET || 'tu_secreto_super_secreto_y_largo'; // Mover a .env
+const JWT_SECRET = process.env.JWT_SECRET || 'tu_secreto_super_secreto_y_largo'; // Deberías mover esto a un .env
 
-/**
- * @desc    Registra un nuevo usuario
- */
+// Registro de usuario
 exports.registerUser = async (req, res) => {
     try {
         const { username, email, password } = req.body;
@@ -34,18 +32,16 @@ exports.registerUser = async (req, res) => {
     }
 };
 
-/**
- * @desc    Inicia sesión y devuelve un token JWT
- */
+// Login de usuario
 exports.loginUser = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { username, password } = req.body;
 
-        if (!email || !password) {
+        if (!username || !password) {
             return res.status(400).json({ message: 'Por favor, proporciona todos los campos.' });
         }
 
-        const user = await User.findOne({ where: { email } });
+        const user = await User.findOne({ where: { username } });
         if (!user) {
             return res.status(400).json({ message: 'Credenciales inválidas.' });
         }
@@ -58,7 +54,7 @@ exports.loginUser = async (req, res) => {
         const payload = {
             user: {
                 id: user.id,
-                email: user.email
+                username: user.username
             }
         };
 
@@ -72,4 +68,3 @@ exports.loginUser = async (req, res) => {
         res.status(500).json({ message: 'Error en el servidor.' });
     }
 };
-

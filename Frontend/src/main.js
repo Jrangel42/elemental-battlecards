@@ -33,7 +33,7 @@ const config = {
      * 7. GameScene: La escena principal del juego donde ocurre la acción.
      * 8. UIScene: Se ejecuta en paralelo a GameScene para mostrar la interfaz de usuario.
      */
-    scene: [ HomeScenes, PreloaderScene, LoginScene, RegisterScene, CreateRoomScene, GameSceneLAN, GameScene, UIScene]
+    scene: [LoginScene, HomeScenes, PreloaderScene,  RegisterScene, CreateRoomScene, GameSceneLAN, GameScene, UIScene]
 }
 
 const game = new Phaser.Game(config);

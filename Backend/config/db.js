@@ -1,26 +1,42 @@
+require('dotenv').config();
+const { Sequelize } = require('sequelize');
+
 const connectDB = async () => {
-  // Verificar si la base de datos está habilitada
   const dbEnabled = (process.env.DB_ENABLED || 'false').toLowerCase() === 'true';
-  
+
   if (!dbEnabled) {
     console.log('Base de datos deshabilitada. Servidor funcionando solo para juego en LAN.');
     return;
   }
-  
+
   try {
-    const { sequelize } = require('../models');
+    const sequelize = new Sequelize(
+      process.env.DB_NAME,
+      process.env.DB_USER,
+      process.env.DB_PASS,
+      {
+        host: process.env.DB_HOST,
+        port: parseInt(process.env.DB_PORT, 10) || 5432,
+        dialect: 'postgres',
+        logging: false,
+        dialectOptions: {
+          ssl: {
+            require: true,
+            rejectUnauthorized: false
+          }
+        }
+      }
+    );
+
     await sequelize.authenticate();
     await sequelize.sync();
-    if ((process.env.DB_USE_SQLITE || 'false').toLowerCase() === 'true') {
-      console.log('Conectado a la base de datos SQLite (in-memory) para pruebas');
-    } else {
-      console.log('Conectado a la base de datos Postgres');
-    }
+
+    console.log("✅ Conectado a la base de datos Postgres en Render");
+    return sequelize;
   } catch (err) {
-    console.error('Error conectando a la base de datos:', err.message);
-    console.error('Si necesitas la base de datos, revisa la configuración DB_* en .env');
-    console.error('El servidor continuará sin funcionalidad de autenticación.');
-    // No salimos del proceso, permitimos que el servidor siga para juego LAN
+    console.error("❌ Error conectando a la base de datos:", err.message);
+    console.error("Revisa variables DB_* en .env");
+    console.error("El servidor continuará sin DB para juego LAN.");
   }
 };
 
