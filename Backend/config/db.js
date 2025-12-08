@@ -1,5 +1,5 @@
-require('dotenv').config();
 const { Sequelize } = require('sequelize');
+const config = require('./config/dbConfig'); // Aquí importas dbConfig.js
 
 const connectDB = async () => {
   const dbEnabled = (process.env.DB_ENABLED || 'false').toLowerCase() === 'true';
@@ -9,27 +9,23 @@ const connectDB = async () => {
     return null;
   }
 
-  try {
-    // Verifica las credenciales de la DB y la configuración SSL
-    console.log(`Conectando a la base de datos en host: ${process.env.DB_HOST}`);
+  const { username, password, database, host, port } = config.production; // Usar la configuración de producción
 
-    const sequelize = new Sequelize(
-      process.env.DB_NAME,
-      process.env.DB_USER,
-      process.env.DB_PASS,
-      {
-        host: process.env.DB_HOST,
-        port: parseInt(process.env.DB_PORT, 10) || 5432,
-        dialect: 'postgres',
-        logging: false,
-        dialectOptions: {
-          ssl: {
-            require: true,  // Esto asegura que la conexión es SSL
-            rejectUnauthorized: false, // Esto permite que se acepte el certificado auto-firmado de Render
-          },
+  try {
+    console.log(`Conectando a la base de datos en host: ${host}`);
+
+    const sequelize = new Sequelize(database, username, password, {
+      host: host,
+      port: parseInt(port, 10) || 5432,
+      dialect: 'postgres',
+      logging: false,
+      dialectOptions: {
+        ssl: {
+          require: true,  // Esto asegura que la conexión es SSL
+          rejectUnauthorized: false, // Esto permite que se acepte el certificado auto-firmado de Render
         },
-      }
-    );
+      },
+    });
 
     await sequelize.authenticate();
     await sequelize.sync();
