@@ -17,6 +17,8 @@ export default class GameScene extends Phaser.Scene {
         this.isLAN = false;
         this.roomCode = null;
         this.playerRole = null; // 'host' o 'guest' en modo LAN
+        // Activar logs de sincronización cuando sea necesario
+        this.debugSync = true;
         this.gameStartData = null; // Datos de inicio del juego en modo LAN
         this.vsBot = false;
         this.selectedCard = null; // Propiedad para la carta seleccionada
@@ -310,10 +312,19 @@ export default class GameScene extends Phaser.Scene {
         const targetCardData = this.player.field[fieldIndex];
 
         console.log('[GameScene] Intento de jugar carta en slot', { slotIndex: fieldIndex, cardFromHand: cardDataFromHand && { id: cardDataFromHand.id, instanceId: cardDataFromHand.instanceId, type: cardDataFromHand.type, level: cardDataFromHand.level } });
+        if (this.debugSync) {
+            console.log('[GameScene][debug] pre-play state:', {
+                playerField: this.player.field.map(f => f && f.instanceId),
+                playerHand: this.player.hand.map(h => h && h.instanceId),
+                targetSlotIndex: fieldIndex,
+                timestamp: Date.now()
+            });
+        }
 
         // Escenario 1: El slot está vacío. Jugamos la carta normalmente.
         if (targetCardData === null) {
             const cardPlayed = this.player.playCardFromHand(cardDataFromHand.instanceId, fieldIndex);
+            if (this.debugSync) console.log('[GameScene][debug] playCardFromHand result', { cardPlayed: cardPlayed && cardPlayed.instanceId, fieldIndex, timestamp: Date.now() });
             if (!cardPlayed) {
                 console.log('El slot ya estaba ocupado (verificación secundaria). La carta volverá a la mano.');
                 return; // No hacemos nada más, dragend la devolverá.
@@ -321,6 +332,11 @@ export default class GameScene extends Phaser.Scene {
 
             // Actualizamos el cardData del objeto visual con los datos del modelo (incluye instanceId)
             this.selectedCard.cardData = cardPlayed;
+            // Asegurar que el sprite y su metadata usan el instanceId definitivo
+            if (cardPlayed && cardPlayed.instanceId) {
+                try { this.selectedCard.setName(cardPlayed.instanceId); } catch (e) {}
+                try { this.selectedCard.setData('instanceId', cardPlayed.instanceId); } catch (e) {}
+            }
 
             // Detenemos cualquier animación activa en la carta seleccionada
             if (this.selectedCard.activeTween) {
@@ -346,6 +362,10 @@ export default class GameScene extends Phaser.Scene {
                     this.selectedCard.input.cursor = 'pointer';
                     this.selectedCard.setData('isCardOnField', true);
                     this.selectedCard.setData('cardData', cardPlayed);
+                    if (cardPlayed && cardPlayed.instanceId) {
+                        try { this.selectedCard.setName(cardPlayed.instanceId); } catch (e) {}
+                        try { this.selectedCard.setData('instanceId', cardPlayed.instanceId); } catch (e) {}
+                    }
                     this.selectedCard.setData('fieldIndex', fieldIndex);
                     this.selectedCard.setData('isRevealed', false);
                     this.selectedCard.setData('startPosition', { x: dropZone.x, y: dropZone.y });
@@ -364,14 +384,16 @@ export default class GameScene extends Phaser.Scene {
                             console.log('[GameScene] Jugador colocó carta en el campo', { cardId: cardPlayed.id, instanceId: cardPlayed.instanceId, type: cardPlayed.type, level: cardPlayed.level, fieldIndex });
                     // Emitir evento de juego a oponente si estamos en LAN
                         if (this.isLAN && this.socket) {
+                        const payload = { 
+                            type: 'play_card', 
+                            actor: 'player', 
+                            playerRole: this.playerRole || null,
+                            card: cardPlayed, 
+                            fieldIndex 
+                        };
+                        if (this.debugSync) console.log('[GameScene][debug] emitiendo play_card payload', { payload, timestamp: Date.now() });
                         try {
-                            this.socket.emit('game_event', { 
-                                type: 'play_card', 
-                                actor: 'player', 
-                                playerRole: this.playerRole || null,
-                                card: cardPlayed, 
-                                fieldIndex 
-                            });
+                            this.socket.emit('game_event', payload);
                         } catch (e) { console.warn('No se pudo emitir evento de juego:', e); }
                     }
 
@@ -1322,6 +1344,7 @@ export default class GameScene extends Phaser.Scene {
      * Acepta instanceId opcional para desambiguar si el modelo y la vista se desincronizan.
      */
     destroyCard(owner, fieldIndex, instanceId = null) {
+        if (this.debugSync) console.log('[GameScene][debug] destroyCard called', { owner: owner && owner.id, fieldIndex, instanceId, timestamp: Date.now() });
         // Intentar obtener cardData desde el modelo
         let cardData = (typeof fieldIndex === 'number' && owner.field[fieldIndex]) ? owner.field[fieldIndex] : null;
 
@@ -1765,7 +1788,12 @@ export default class GameScene extends Phaser.Scene {
         const cardObj = new Card(this, slotObj.x, slotObj.y, cardData, isOpponent);
         cardObj.setDisplaySize(this.cardFieldSize.width, this.cardFieldSize.height);
         if (isOpponent) cardObj.setData('isOpponentCard', true);
+        // Aseguramos que la vista tenga la misma referencia de datos y metadata de instancia
         cardObj.setData('cardData', cardData);
+        if (cardData && cardData.instanceId) {
+            try { cardObj.setName(cardData.instanceId); } catch (e) {}
+            try { cardObj.setData('instanceId', cardData.instanceId); } catch (e) {}
+        }
         cardObj.setData('isCardOnField', true);
         if (fieldIndex !== null && typeof fieldIndex !== 'undefined') cardObj.setData('fieldIndex', fieldIndex);
         cardObj.setData('isRevealed', !!revealed);
@@ -1821,7 +1849,9 @@ export default class GameScene extends Phaser.Scene {
 
                 // Actualizar modelo
                 try {
+                    if (this.debugSync) console.log('[GameScene][debug] handling remote play_card', { cardInstanceId: card && card.instanceId, fieldIndex, targetBefore: targetModel.field.map(f=>f&&f.instanceId), timestamp: Date.now() });
                     targetModel.field[fieldIndex] = card;
+                    if (this.debugSync) console.log('[GameScene][debug] model updated for remote play_card', { targetAfter: targetModel.field.map(f=>f&&f.instanceId) });
                 } catch (e) {
                     console.warn('No se pudo actualizar el modelo remoto:', e);
                 }
@@ -1829,8 +1859,12 @@ export default class GameScene extends Phaser.Scene {
                 // Crear visual en el slot correspondiente usando helper central
                 const slot = this[targetSlotsName] && this[targetSlotsName][fieldIndex];
                 if (slot) {
+                    // log si ya existía un objeto visual en ese slot
+                    const existing = this.children.list.find(c => c.getData && c.getData('fieldIndex') === fieldIndex && c.getData('isCardOnField'));
+                    if (this.debugSync) console.log('[GameScene][debug] slot visual before remote play', { existing: existing && ((existing.getData('cardData') && existing.getData('cardData').instanceId) || existing.getData('instanceId')), slotIndex: fieldIndex });
                     const oppCard = this.createFieldCard(slot, card, { isOpponent: isRemotePlayer, revealed: false, fieldIndex });
                     console.log('[GameScene] Carta colocada por remoto', { actor: payload.actor || (isRemotePlayer ? 'opponent' : 'player'), playerRole: payload.playerRole || null, cardId: card.id, instanceId: card.instanceId, type: card.type, level: card.level, fieldIndex });
+                    if (this.debugSync) console.log('[GameScene][debug] slot visual after remote play', { created: oppCard && oppCard.getData && oppCard.getData('instanceId'), slotIndex: fieldIndex, timestamp: Date.now() });
                 }
                 
                 // En LAN, marcar que el oponente actuó

@@ -23,8 +23,12 @@ export default class Card extends Phaser.GameObjects.Sprite {
         this.level = cardData.level;
         this.isFaceDown = isFaceDown;
 
-        // Asignamos un nombre al GameObject para facilitar la depuración.
-        this.setName(cardData.instanceId); // Ahora el 'name' será el ID único de la carta.
+        // Asignamos un nombre al GameObject para facilitar la depuración
+        // y añadimos el `instanceId` también como metadata para búsquedas.
+        if (cardData && cardData.instanceId) {
+            this.setName(cardData.instanceId);
+            this.setData('instanceId', cardData.instanceId);
+        }
 
         // Propiedades para las reglas de ataque
         this.canAttack = true;

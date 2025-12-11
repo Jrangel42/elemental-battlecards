@@ -83,12 +83,15 @@ export default class Player {
      * @returns {Card|null} La carta jugada o null si no se pudo.
      */
     playCardFromHand(instanceId, fieldIndex) {
+        if (this.scene && this.scene.debugSync) {
+            console.log('[Player][debug] playCardFromHand called', { player: this.id, instanceId, fieldIndex, handIds: this.hand.map(h => h && h.instanceId), fieldIds: this.field.map(f => f && f.instanceId), timestamp: Date.now() });
+        }
         const cardIndex = this.hand.findIndex(card => card.instanceId === instanceId);
         if (cardIndex > -1 && this.field[fieldIndex] === null) {
             const cardToPlay = this.hand.splice(cardIndex, 1)[0]; // Saca la carta de la mano
 
             this.field[fieldIndex] = cardToPlay; // Coloca la nueva instancia en el campo
-
+            if (this.scene && this.scene.debugSync) console.log(`[Player][debug] Carta movida al slot`, { player: this.id, instanceId: cardToPlay.instanceId, fieldIndex, resultingField: this.field.map(f=>f&&f.instanceId) });
             console.log(`[Player] Carta con instanceId ${instanceId} movida al slot ${fieldIndex} del campo.`);
             return cardToPlay;
         }
@@ -103,6 +106,7 @@ export default class Player {
      * @returns {{newCard: object, emptiedIndex: number}|null} Un objeto con la nueva carta y el índice del slot vaciado.
      */
     fuseCards(draggedIndex, targetIndex) {
+        if (this.scene && this.scene.debugSync) console.log('[Player][debug] fuseCards called', { player: this.id, draggedIndex, targetIndex, fieldSnapshot: this.field.map(f=>f&&f.instanceId), timestamp: Date.now() });
         // Validaciones básicas de índices
         if (typeof draggedIndex !== 'number' || typeof targetIndex !== 'number') {
             console.warn('[Player.fuseCards] Índices inválidos:', draggedIndex, targetIndex);
@@ -151,6 +155,7 @@ export default class Player {
         this.field[targetIndex] = newCardInstance;
         this.field[draggedIndex] = null;
 
+        if (this.scene && this.scene.debugSync) console.log('[Player][debug] fuseCards result', { newCardInstance: newCardInstance.instanceId, targetIndex, emptiedIndex: draggedIndex, fieldAfter: this.field.map(f=>f&&f.instanceId) });
         console.log(`Modelo actualizado: Carta ${newCardInstance.id} (Nivel ${newCardInstance.level}) creada en el slot ${targetIndex}`);
         return { newCard: newCardInstance, emptiedIndex: draggedIndex };
     }
@@ -162,6 +167,7 @@ export default class Player {
      * @returns {object|null} Los datos de la nueva carta fusionada o null si falla.
      */
     fuseFromHand(instanceId, targetIndex) {
+        if (this.scene && this.scene.debugSync) console.log('[Player][debug] fuseFromHand called', { player: this.id, instanceId, targetIndex, handIds: this.hand.map(h=>h&&h.instanceId), targetFieldId: this.field[targetIndex] && this.field[targetIndex].instanceId, timestamp: Date.now() });
         const cardFromHandIndex = this.hand.findIndex(c => c.instanceId === instanceId);
         const cardOnField = this.field[targetIndex];
 
@@ -195,7 +201,7 @@ export default class Player {
 
         // Reemplazamos la carta en el campo con la nueva carta fusionada
         this.field[targetIndex] = newCardInstance;
-
+        if (this.scene && this.scene.debugSync) console.log('[Player][debug] fuseFromHand result', { newCardInstance: newCardInstance.instanceId, targetIndex, fieldAfter: this.field.map(f=>f&&f.instanceId) });
         return newCardInstance;
     }
     /**
