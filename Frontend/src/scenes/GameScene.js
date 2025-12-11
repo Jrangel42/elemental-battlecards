@@ -664,6 +664,7 @@ export default class GameScene extends Phaser.Scene {
             if (!acted && !this.opponentMustAttackThisTurn) {
                 const fusionPlan = this.findBestFusion();
                 if (fusionPlan && fusionPlan.kind === 'field') {
+                    if (this.debugSync) console.log('[GameScene][debug] Oponente BOT fusionando campo', { indices: fusionPlan.indices, timestamp: Date.now() });
                     const [idxA, idxB] = fusionPlan.indices;
 
                     // Guardar datos originales antes de modificar el modelo
@@ -717,6 +718,7 @@ export default class GameScene extends Phaser.Scene {
                         return;
                     }
                 } else if (fusionPlan && fusionPlan.kind === 'hand') {
+                    if (this.debugSync) console.log('[GameScene][debug] Oponente BOT fusionando desde mano', { handInstanceId: fusionPlan.handInstanceId, targetIndex: fusionPlan.targetIndex, timestamp: Date.now() });
                     const fused = this.opponent.fuseFromHand(fusionPlan.handInstanceId, fusionPlan.targetIndex);
                     if (fused) {
                         const slotObj = this['opponent_battle_slots'][fusionPlan.targetIndex];
@@ -740,6 +742,7 @@ export default class GameScene extends Phaser.Scene {
                 // Forzar ataques si obligado y no hay defensas => ataque directo para esencias
                 const playerHasField = this.player.field.some(c => c !== null);
                 if (this.opponentMustAttackThisTurn && availableAttackers.length > 0 && !playerHasField) {
+                    if (this.debugSync) console.log('[GameScene][debug] Oponente BOT ataque directo (obligado)', { attackerCount: availableAttackers.length, timestamp: Date.now() });
                     const attacker = Phaser.Math.RND.pick(availableAttackers);
                     this.revealOpponentCard(attacker);
                     this._registerCardAttack(attacker, 'opponent');
@@ -751,6 +754,7 @@ export default class GameScene extends Phaser.Scene {
 
                 // Si está obligado y hay un bestAttack -> ejecutar
                 if (this.opponentMustAttackThisTurn && bestAttack) {
+                    if (this.debugSync) console.log('[GameScene][debug] Oponente BOT ataque calculado (obligado)', { attackerIndex: bestAttack.attacker.index, defenderIndex: bestAttack.defender.index, score: bestAttack.score, timestamp: Date.now() });
                     const attackerObj = this.children.list.find(c => c.getData('isOpponentCard') && c.getData('fieldIndex') === bestAttack.attacker.index);
                     const defenderObj = this.children.list.find(c => !c.getData('isOpponentCard') && c.getData('fieldIndex') === bestAttack.defender.index);
                     if (attackerObj && defenderObj && attackerObj.getData('blockedTurn') !== this.opponentTurnNumber) {
@@ -773,6 +777,7 @@ export default class GameScene extends Phaser.Scene {
 
                 // Si no obligado, atacar solo si score alto
                 if (!this.opponentMustAttackThisTurn && bestAttack && bestAttack.score >= 5) {
+                    if (this.debugSync) console.log('[GameScene][debug] Oponente BOT ataque calculado (opcional)', { attackerIndex: bestAttack.attacker.index, defenderIndex: bestAttack.defender.index, score: bestAttack.score, timestamp: Date.now() });
                     const attackerObj = this.children.list.find(c => c.getData('isOpponentCard') && c.getData('fieldIndex') === bestAttack.attacker.index);
                     const defenderObj = this.children.list.find(c => !c.getData('isOpponentCard') && c.getData('fieldIndex') === bestAttack.defender.index);
                     if (attackerObj && defenderObj && attackerObj.getData('blockedTurn') !== this.opponentTurnNumber) {
@@ -798,6 +803,7 @@ export default class GameScene extends Phaser.Scene {
                     const defenders = this.children.list.filter(c => !c.getData('isOpponentCard') && c.getData('isCardOnField'));
                     if (defenders.length === 0) {
                         // ataque directo
+                        if (this.debugSync) console.log('[GameScene][debug] Oponente BOT ataque directo aleatorio (obligado)', { attackerCount: availableAttackers.length, timestamp: Date.now() });
                         const atk = Phaser.Math.RND.pick(availableAttackers);
                         if (atk) {
                             this.revealOpponentCard(atk);
@@ -808,6 +814,7 @@ export default class GameScene extends Phaser.Scene {
                             return;
                         }
                     } else {
+                        if (this.debugSync) console.log('[GameScene][debug] Oponente BOT ataque aleatorio (obligado)', { attackerCount: availableAttackers.length, defenderCount: defenders.length, timestamp: Date.now() });
                         const atk = Phaser.Math.RND.pick(availableAttackers);
                         const def = Phaser.Math.RND.pick(defenders);
                         this.revealOpponentCard(atk);
@@ -845,6 +852,7 @@ export default class GameScene extends Phaser.Scene {
                     if (pickIdx === null) pickIdx = 0;
                     const cardToPlay = this.opponent.hand[pickIdx];
                     const slotIndex = Phaser.Math.RND.pick(emptySlots);
+                    if (this.debugSync) console.log('[GameScene][debug] Oponente BOT jugando carta', { cardInstanceId: cardToPlay.instanceId, slotIndex, timestamp: Date.now() });
                     const played = this.opponent.playCardFromHand(cardToPlay.instanceId, slotIndex);
                     if (played) {
                         const slotObj = this['opponent_battle_slots'][slotIndex];
@@ -1383,10 +1391,16 @@ export default class GameScene extends Phaser.Scene {
 
         // Si no encontramos por instanceId, buscar por índice/propiedad owner
         if (!cardObject && typeof fieldIndex === 'number') {
-            cardObject = this.children.list.find(child =>
-                child.getData('fieldIndex') === fieldIndex &&
-                ((owner.id === 'player' && child.getData('isCardOnField')) || (owner.id === 'opponent' && child.getData('isOpponentCard')))
-            );
+            const isOpponentCard = owner.id === 'opponent';
+            cardObject = this.children.list.find(child => {
+                // Asegurarse de que el objeto tiene el método getData antes de usarlo
+                if (!child.getData) return false;
+                // Obtener si el objeto visual es del oponente
+                if (!child.getData) return false;
+                const childIsOpponent = !!child.getData('isOpponentCard');
+                // La búsqueda ahora es estricta: el índice y el propietario deben coincidir
+                return child.getData('fieldIndex') === fieldIndex && child.getData('isCardOnField') && childIsOpponent === isOpponentCard;
+            });
         }
 
         // Si no hay modelo ni objeto visual, registrar y salir
@@ -1697,7 +1711,8 @@ export default class GameScene extends Phaser.Scene {
      */
     selectCard(cardObject) {
         this.selectedCard = cardObject;
-        console.log('Carta seleccionada:', cardObject.cardData);
+        const fieldIndex = cardObject.getData('fieldIndex');
+        console.log('Carta seleccionada:', { ...cardObject.cardData, fieldIndex: fieldIndex !== undefined ? fieldIndex : null });
 
         // La animación de "levantar" la carta ahora solo la mueve verticalmente.
         // No cambiaremos su tamaño para mantener la consistencia.
@@ -1880,8 +1895,10 @@ export default class GameScene extends Phaser.Scene {
                 const resultCard = payload.resultCard;
                 
                 // Actualizar modelo
+                if (this.debugSync) console.log('[GameScene][debug] handling remote fuse_cards', { sourceIndex, targetIndex, resultCardInstanceId: resultCard && resultCard.instanceId, targetBefore: targetModel.field.map(f=>f&&f.instanceId), timestamp: Date.now() });
                 targetModel.field[sourceIndex] = null;
                 targetModel.field[targetIndex] = resultCard;
+                if (this.debugSync) console.log('[GameScene][debug] model updated for remote fuse_cards', { targetAfter: targetModel.field.map(f=>f&&f.instanceId) });
                 
                 // Destruir objetos visuales en ambos índices
                 const cardObjs = this.children.list.filter(c => 
@@ -1894,9 +1911,13 @@ export default class GameScene extends Phaser.Scene {
                 // Crear carta fusionada
                 const slot = this[targetSlotsName][targetIndex];
                 if (slot) {
+                    // log si ya existía un objeto visual en ese slot
+                    const existing = this.children.list.find(c => c.getData && c.getData('fieldIndex') === targetIndex && c.getData('isCardOnField'));
+                    if (this.debugSync) console.log('[GameScene][debug] slot visual before remote fuse_cards', { existing: existing && ((existing.getData('cardData') && existing.getData('cardData').instanceId) || existing.getData('instanceId')), slotIndex: targetIndex });
                     const fusedObj = this.createFieldCard(slot, resultCard, { isOpponent: true, revealed: true, fieldIndex: targetIndex });
                     try { fusedObj.setTexture(`card-${resultCard.type}-${resultCard.level}`); } catch (e) {}
                     console.log('[GameScene] Fusión remota en campo', { sourceIndex, targetIndex, resultCard });
+                    if (this.debugSync) console.log('[GameScene][debug] slot visual after remote fuse_cards', { created: fusedObj && fusedObj.getData && fusedObj.getData('instanceId'), slotIndex: targetIndex, timestamp: Date.now() });
                 }
                 
                 // En LAN, marcar que el oponente actuó
@@ -1911,7 +1932,9 @@ export default class GameScene extends Phaser.Scene {
                 const resultCard = payload.resultCard;
                 
                 // Actualizar modelo
+                if (this.debugSync) console.log('[GameScene][debug] handling remote fuse_from_hand', { targetIndex, resultCardInstanceId: resultCard && resultCard.instanceId, targetBefore: targetModel.field.map(f=>f&&f.instanceId), timestamp: Date.now() });
                 targetModel.field[targetIndex] = resultCard;
+                if (this.debugSync) console.log('[GameScene][debug] model updated for remote fuse_from_hand', { targetAfter: targetModel.field.map(f=>f&&f.instanceId) });
                 
                 // Destruir carta anterior en targetIndex
                 const oldCard = this.children.list.find(c => 
@@ -1924,9 +1947,13 @@ export default class GameScene extends Phaser.Scene {
                 // Crear carta fusionada
                 const slot = this[targetSlotsName][targetIndex];
                 if (slot) {
+                    // log si ya existía un objeto visual en ese slot
+                    const existing = this.children.list.find(c => c.getData && c.getData('fieldIndex') === targetIndex && c.getData('isCardOnField'));
+                    if (this.debugSync) console.log('[GameScene][debug] slot visual before remote fuse_from_hand', { existing: existing && ((existing.getData('cardData') && existing.getData('cardData').instanceId) || existing.getData('instanceId')), slotIndex: targetIndex });
                     const fusedObj = this.createFieldCard(slot, resultCard, { isOpponent: true, revealed: true, fieldIndex: targetIndex });
                     try { fusedObj.setTexture(`card-${resultCard.type}-${resultCard.level}`); } catch (e) {}
                     console.log('[GameScene] Fusión remota desde mano', { targetIndex, resultCard });
+                    if (this.debugSync) console.log('[GameScene][debug] slot visual after remote fuse_from_hand', { created: fusedObj && fusedObj.getData && fusedObj.getData('instanceId'), slotIndex: targetIndex, timestamp: Date.now() });
                 }
                 
                 // Actualizar mano del oponente
@@ -1944,7 +1971,7 @@ export default class GameScene extends Phaser.Scene {
                 const defenderIndex = payload.defenderIndex;
                 const result = payload.result;
                 
-                // Encontrar objetos visuales
+                if (this.debugSync) console.log('[GameScene][debug] handling remote attack', { attackerIndex, defenderIndex, result, timestamp: Date.now() });
                 const attackerObj = this.children.list.find(c => 
                     c.getData('isOpponentCard') && 
                     c.getData('isCardOnField') &&
