@@ -48,6 +48,10 @@ export default class GameScene extends Phaser.Scene {
         // Contadores de inactividad
         this.playerInactiveTurns = 0; // Contador de turnos inactivos del jugador
         this.opponentInactiveTurns = 0; // Contador de turnos inactivos del oponente
+
+        // --- Control de animaciones y flujo de turnos ---
+        this.blockingAnimations = 0; // Contador para animaciones que deben completarse antes de pasar de turno.
+        this.pendingTurnChange = null; // Almacena el próximo turno a iniciar ('player' u 'opponent').
     }
 
     /**
@@ -152,6 +156,8 @@ export default class GameScene extends Phaser.Scene {
         this.opponentTurnNumber = 0;
         this.playerInactiveTurns = 0;
         this.opponentInactiveTurns = 0;
+        this.blockingAnimations = 0;
+        this.pendingTurnChange = null;
 
         // Mostramos un mensaje de bienvenida con el nombre del usuario temporal.
         console.log(`¡Bienvenido a GameScene, ${this.playerData?.username || 'Jugador'}!`);
@@ -397,7 +403,7 @@ export default class GameScene extends Phaser.Scene {
                         } catch (e) { console.warn('No se pudo emitir evento de juego:', e); }
                     }
 
-                    this.time.delayedCall(200, () => this.endPlayerTurn());
+                    this.endPlayerTurn();
                 }
             });
 
@@ -543,7 +549,7 @@ export default class GameScene extends Phaser.Scene {
         
         this.deselectCard(false);
         console.log('[GameScene] Carta fusionada creada en campo', { fieldIndex: targetIndex, fusedCard: fusedCardData });
-        this.time.delayedCall(350, () => this.endPlayerTurn());
+        this.endPlayerTurn();
     }
 
     /**
@@ -616,7 +622,7 @@ export default class GameScene extends Phaser.Scene {
                 });
             } catch (e) { console.warn('No se pudo emitir evento de fusión desde mano:', e); }
         }
-        this.time.delayedCall(350, () => this.endPlayerTurn());
+        this.endPlayerTurn();
 
         // (No se admite fusiones desde la mano.)
     }
@@ -714,7 +720,7 @@ export default class GameScene extends Phaser.Scene {
                         this.refreshOpponentHand();
                         this.updateDeckCounts();
 
-                        this.time.delayedCall(300, () => this.endOpponentTurn(true));
+                        this.endOpponentTurn(true);
                         return;
                     }
                 } else if (fusionPlan && fusionPlan.kind === 'hand') {
@@ -728,7 +734,7 @@ export default class GameScene extends Phaser.Scene {
                         this.opponent.drawCard();
                         this.refreshOpponentHand();
                         this.updateDeckCounts();
-                        this.time.delayedCall(300, () => this.endOpponentTurn(true));
+                        this.endOpponentTurn(true);
                         return;
                     }
                 }
@@ -748,7 +754,7 @@ export default class GameScene extends Phaser.Scene {
                     this._registerCardAttack(attacker, 'opponent');
                     this.opponent.fillEssence(attacker.getData('cardData').type);
                     acted = true;
-                    this.time.delayedCall(300, () => this.endOpponentTurn(true));
+                    this.endOpponentTurn(true);
                     return;
                 }
 
@@ -768,7 +774,7 @@ export default class GameScene extends Phaser.Scene {
                                 else if (res.loser === 'defender') this.destroyCard(this.player, defenderObj.getData('fieldIndex'));
                                 acted = true;
                                 this.opponentPerformedAttackThisTurn = true;
-                                this.time.delayedCall(300, () => this.endOpponentTurn(true));
+                                this.endOpponentTurn(true);
                             }
                         });
                         return;
@@ -791,7 +797,7 @@ export default class GameScene extends Phaser.Scene {
                                 else if (res.loser === 'defender') this.destroyCard(this.player, defenderObj.getData('fieldIndex'));
                                 acted = true;
                                 this.opponentPerformedAttackThisTurn = true;
-                                this.time.delayedCall(300, () => this.endOpponentTurn(true));
+                                this.endOpponentTurn(true);
                             }
                         });
                         return;
@@ -810,7 +816,7 @@ export default class GameScene extends Phaser.Scene {
                             this._registerCardAttack(atk, 'opponent');
                             this.opponent.fillEssence(atk.getData('cardData').type);
                             acted = true;
-                            this.time.delayedCall(250, () => this.endOpponentTurn(true));
+                            this.endOpponentTurn(true);
                             return;
                         }
                     } else {
@@ -828,7 +834,7 @@ export default class GameScene extends Phaser.Scene {
                                 else if (res.loser === 'defender') this.destroyCard(this.player, def.getData('fieldIndex'));
                                 acted = true;
                                 this.opponentPerformedAttackThisTurn = true;
-                                this.time.delayedCall(300, () => this.endOpponentTurn(true));
+                                this.endOpponentTurn(true);
                             }
                         });
                         return;
@@ -861,7 +867,7 @@ export default class GameScene extends Phaser.Scene {
                         this.refreshOpponentHand();
                         this.updateDeckCounts();
                         acted = true;
-                        this.time.delayedCall(300, () => this.endOpponentTurn(true));
+                        this.endOpponentTurn(true);
                         return;
                     }
                 }
@@ -1017,8 +1023,7 @@ export default class GameScene extends Phaser.Scene {
         if (this.playerMustAttackThisTurn && !playerHasFieldCards) {
                 console.log('[GameScene] Obligado a atacar pero no tiene cartas -> salto de turno automático', { playerTurnsSinceLastAttack: this.playerTurnsSinceLastAttack });
             this.playerTurnsSinceLastAttack = 0;
-            this.deselectCard(false);
-            this.time.delayedCall(80, () => this.endPlayerTurn());
+            this.endPlayerTurn();
             return;
         }
     }
@@ -1036,6 +1041,8 @@ export default class GameScene extends Phaser.Scene {
      */
     endPlayerTurn() {
         if (this.gameState !== 'player-turn') return;
+        // Si hay animaciones en curso, solo marcamos el cambio de turno como pendiente.
+        if (this.blockingAnimations > 0) { this.pendingTurnChange = 'opponent'; return; }
 
         console.log('[GameScene] Fin del turno del JUGADOR', { playerHasActed: this.playerHasActed, performedAttack: this.playerPerformedAttackThisTurn, turnNumber: this.playerTurnNumber });
 
@@ -1079,14 +1086,14 @@ export default class GameScene extends Phaser.Scene {
         
         // En modo local o bot, iniciar turno del oponente directamente
         if (!this.isLAN) {
-            this.startOpponentTurn();
+            this.time.delayedCall(100, () => this.startOpponentTurn());
         }
         // En modo LAN, el evento 'turn_changed' del servidor iniciará el siguiente turno
     }
 
     /**
      * Finaliza el turno del oponente y devuelve el control al jugador, comprobando victoria.
-     * @param {boolean} opponentActed - Si el oponente realizó alguna acción.
+     * @param {boolean} [opponentActed=false] - Si el oponente realizó alguna acción.
      */
     endOpponentTurn(opponentActed = false) {
         if (this.gameState !== 'opponent-turn') return;
@@ -1118,7 +1125,7 @@ export default class GameScene extends Phaser.Scene {
         // En modo LAN, el servidor gestiona los turnos (no llamamos startPlayerTurn aquí)
         // En modo bot, sí llamamos startPlayerTurn
         if (!this.isLAN) {
-            this.startPlayerTurn();
+            this.time.delayedCall(100, () => this.startPlayerTurn());
         }
         // En modo LAN, esperamos el evento 'turn_changed' del servidor
     }
@@ -1248,6 +1255,8 @@ export default class GameScene extends Phaser.Scene {
     }
 
     animateAttack(attackingCardObject, target, result) {
+        this.blockingAnimations++;
+        console.log('[GameScene] Animación de ataque iniciada. Bloqueos activos:', this.blockingAnimations);
         this.tweens.add({
             targets: attackingCardObject,
             x: target.x, // Corregido: usar 'target.x'
@@ -1257,33 +1266,31 @@ export default class GameScene extends Phaser.Scene {
             ease: 'Power1',
             onComplete: () => {
                 this.deselectCard(true); // asegurar que vuelva a startPosition tras el ataque
-                // Después de una breve pausa para que se vea el resultado, aplicamos el daño.
-                this.time.delayedCall(250, () => {
-                    console.log('[GameScene] animateAttack local complete, result:', result, { attackerFieldIndex: attackingCardObject.getData('fieldIndex'), target });
-                    // Determinar owner del atacante según metadata visual
-                    const attackerIsOpponent = !!attackingCardObject.getData('isOpponentCard');
-                    const attackerOwner = attackerIsOpponent ? this.opponent : this.player;
-                    // Si el target es un objeto visual de carta, determinar su owner
-                    let defenderOwner = null;
-                    let defenderFieldIndex = null;
-                    if (target && typeof target.getData === 'function') {
-                        const defenderIsOpponent = !!target.getData('isOpponentCard');
-                        defenderOwner = defenderIsOpponent ? this.opponent : this.player;
-                        defenderFieldIndex = target.getData('fieldIndex');
-                    }
+                console.log('[GameScene] animateAttack local complete, result:', result, { attackerFieldIndex: attackingCardObject.getData('fieldIndex'), target });
+                // Determinar owner del atacante según metadata visual
+                const attackerIsOpponent = !!attackingCardObject.getData('isOpponentCard');
+                const attackerOwner = attackerIsOpponent ? this.opponent : this.player;
+                // Si el target es un objeto visual de carta, determinar su owner
+                let defenderOwner = null;
+                let defenderFieldIndex = null;
+                if (target && typeof target.getData === 'function') {
+                    const defenderIsOpponent = !!target.getData('isOpponentCard');
+                    defenderOwner = defenderIsOpponent ? this.opponent : this.player;
+                    defenderFieldIndex = target.getData('fieldIndex');
+                }
 
-                    if (result.loser === 'attacker') {
-                        const idx = attackingCardObject.getData('fieldIndex');
-                        console.log('[GameScene] animateAttack: destruyendo atacante', { owner: attackerOwner.id, idx });
-                        this.destroyCard(attackerOwner, idx);
-                    } else if (result.loser === 'defender' && defenderOwner && typeof defenderFieldIndex === 'number') {
-                        console.log('[GameScene] animateAttack: destruyendo defensor', { owner: defenderOwner.id, idx: defenderFieldIndex });
-                        this.destroyCard(defenderOwner, defenderFieldIndex);
-                    }
+                if (result.loser === 'attacker') {
+                    const idx = attackingCardObject.getData('fieldIndex');
+                    console.log('[GameScene] animateAttack: destruyendo atacante', { owner: attackerOwner.id, idx });
+                    this.destroyCard(attackerOwner, idx);
+                } else if (result.loser === 'defender' && defenderOwner && typeof defenderFieldIndex === 'number') {
+                    console.log('[GameScene] animateAttack: destruyendo defensor', { owner: defenderOwner.id, idx: defenderFieldIndex });
+                    this.destroyCard(defenderOwner, defenderFieldIndex);
+                }
 
-                    // Tras el ataque, el turno del jugador termina automáticamente
-                    this.endPlayerTurn();
-                });
+                // Tras el ataque, el turno del jugador termina automáticamente
+                this.endPlayerTurn();
+                this._animationComplete();
             }
         });
     }
@@ -1496,18 +1503,40 @@ export default class GameScene extends Phaser.Scene {
                 }
             } catch (e) { /* ignore metadata check errors */ }
 
-            console.log('[GameScene] destroyCard: animando destrucción visual', { owner: owner.id, fieldIndex, instanceId: instanceId || (cardObject.getData && cardObject.getData('cardData') && cardObject.getData('cardData').instanceId) });
-            this.tweens.add({
-                targets: cardObject,
-                alpha: 0,
-                scale: (cardObject.scale || 1) * 0.8,
-                duration: 250,
-                onComplete: () => {
-                    console.log('[GameScene] destroyCard: destroy() llamado sobre objeto visual', { name: cardObject.name, fieldIndex });
-                    if (cardObject && cardObject.destroy) cardObject.destroy();
-                    visualDestroyed = true;
-                    tryFinalize();
-                }
+            this.blockingAnimations++;
+            console.log('[GameScene] Animación de destrucción iniciada. Bloqueos activos:', this.blockingAnimations);
+            console.log('[GameScene] destroyCard: iniciando efecto de partículas para destrucción', { owner: owner.id, fieldIndex, instanceId: finalInstanceId });
+
+            // Hacemos la carta original invisible para que solo se vean las partículas.
+            cardObject.setVisible(false);
+
+            // En Phaser 3.60+, this.add.particles() crea directamente un emisor de partículas.
+            // Ya no se devuelve un manager ni se usa createEmitter.
+            const particles = this.add.particles(
+                cardObject.x,
+                cardObject.y,
+                cardObject.texture.key,
+            {
+                speed: { min: 50, max: 200 }, // Las partículas se dispersan a diferentes velocidades.
+                angle: { min: 0, max: 360 }, // Se dispersan en todas las direcciones.
+                scale: { start: 0.1, end: 0 }, // Empiezan a la mitad de su tamaño y se encogen hasta desaparecer.
+                alpha: { start: 1, end: 0 }, // Se desvanecen.
+                lifespan: 600, // Viven por 600ms.
+                blendMode: 'SCREEN', // Un modo de mezcla que se ve bien para efectos de energía/desintegración.
+                emitting: false // No empieza a emitir partículas constantemente.
+            });
+
+            // Le decimos al emisor que explote una vez en su posición.
+            particles.explode(40);
+
+            // Después de un tiempo, destruimos tanto la carta original como el sistema de partículas.
+            this.time.delayedCall(1000, () => { // Esperamos 1 segundo para que el efecto termine.
+                console.log('[GameScene] destroyCard: Limpiando objeto visual y partículas', { name: cardObject.name, fieldIndex });
+                if (cardObject && cardObject.destroy) cardObject.destroy();
+                if (particles) particles.destroy(); // Muy importante destruir el gestor de partículas para liberar memoria.
+                visualDestroyed = true;
+                this._animationComplete();
+                tryFinalize();
             });
         }
 
@@ -2198,6 +2227,25 @@ export default class GameScene extends Phaser.Scene {
             cardObject.setData('blockedTurn', nowTurn + 1);
             cardObject.setData('consecutiveAttacks', 0);
             console.log(`[GameScene] Carta ${cardData.id} bloqueada para el turno ${nowTurn + 1} (nivel 3).`);
+        }
+    }
+
+    /**
+     * --- NUEVO HELPER ---
+     * Se llama cuando una animación bloqueante finaliza. Decrementa el contador
+     * y, si no quedan más bloqueos, intenta avanzar al siguiente turno.
+     */
+    _animationComplete() {
+        this.blockingAnimations = Math.max(0, this.blockingAnimations - 1);
+        console.log('[GameScene] Animación completada. Bloqueos restantes:', this.blockingAnimations);
+
+        // Si no hay más animaciones y hay un cambio de turno pendiente...
+        if (this.blockingAnimations === 0 && this.pendingTurnChange) {
+            console.log(`[GameScene] Todas las animaciones completadas. Procediendo al turno de: ${this.pendingTurnChange}`);
+            const nextTurn = this.pendingTurnChange;
+            this.pendingTurnChange = null; // Limpiamos el flag
+            if (nextTurn === 'player') this.endOpponentTurn();
+            else if (nextTurn === 'opponent') this.endPlayerTurn();
         }
     }
 }
