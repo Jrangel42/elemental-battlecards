@@ -11,15 +11,24 @@ export default class HomeScenes extends Phaser.Scene {
     }
 
     preload() {
-        this.load.image("home-background", "/assets/images/home.png");
+        this.load.video("home-video", "/assets/images/home.mp4", { muted: true });
     }
 
     create() {
         const { width, height } = this.scale;
 
         // BACKGROUND
-        this.bg = this.add.image(width / 2, height / 2, "home-background");
-        this.bg.setDisplaySize(width, height);
+        this.bg = this.add.video(width / 2, height / 2, 'home-video').setOrigin(0.5);
+        this.bg.setDepth(-1); // Poner el video al fondo
+
+        // Esperar a que el video esté listo para escalar correctamente
+        this.bg.on('play', () => {
+            const scaleX = width / this.bg.width;
+            const scaleY = height / this.bg.height;
+            const scale = Math.max(scaleX, scaleY);
+            this.bg.setScale(scale);
+        });
+        this.bg.play(true); // Reproducir en bucle
 
         // UI TEMPLATE (incluye modal overlay)
         const html = `<div class="scene-root">

@@ -11,8 +11,8 @@ import GameSceneLAN from './scenes/GameSceneLAN.js';
 const config = {
     type: Phaser.AUTO,
     dom: { createContainer: true },
-    width: 1440,
-    height: 1024,
+    width: 1600,
+    height: 1000,
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH
@@ -33,7 +33,7 @@ const config = {
      * 7. GameScene: La escena principal del juego donde ocurre la acción.
      * 8. UIScene: Se ejecuta en paralelo a GameScene para mostrar la interfaz de usuario.
      */
-    scene: [GameScene, LoginScene, HomeScenes, PreloaderScene,  RegisterScene, CreateRoomScene, GameSceneLAN, UIScene]
+    scene: [GameScene, LoginScene,  HomeScenes,  PreloaderScene,  RegisterScene, CreateRoomScene, GameSceneLAN, UIScene]
 }
 
 const game = new Phaser.Game(config);

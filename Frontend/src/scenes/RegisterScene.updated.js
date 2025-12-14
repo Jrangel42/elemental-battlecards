@@ -9,16 +9,24 @@ export default class RegisterSceneUpdated extends Phaser.Scene {
     }
 
     preload() {
-        this.load.image('inicio-bg', '/assets/images/inicio/inicio.png');
+        this.load.video('inicio-video', '/assets/images/inicio/inicio.mp4', { muted: true });
         this.load.image('logo', '/assets/images/logotipo.png');
     }
 
     create() {
         const { width, height } = this.scale;
-        this.bg = this.add.image(0, 0, 'inicio-bg').setOrigin(0, 0);
-        this.bg.displayWidth = width;
-        this.bg.displayHeight = height;
+        // BACKGROUND VIDEO
+        this.bg = this.add.video(width / 2, height / 2, 'inicio-video').setOrigin(0.5);
+        this.bg.setDepth(-1); // Poner el video al fondo
 
+        // Esperar a que el video esté listo para escalar correctamente
+        this.bg.on('play', () => {
+            const scaleX = width / this.bg.width;
+            const scaleY = height / this.bg.height;
+            const scale = Math.max(scaleX, scaleY);
+            this.bg.setScale(scale);
+        });
+        this.bg.play(true); // Reproducir en bucle
         const formHTML = `
             <style>
                 .overlay {

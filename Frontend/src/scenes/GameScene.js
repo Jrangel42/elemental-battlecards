@@ -73,7 +73,7 @@ export default class GameScene extends Phaser.Scene {
 
     preload() {
         // Fondo general
-        this.load.image('board-bg', '/assets/images/campo juego/campo.png');
+        this.load.video('campo-video', '/assets/images/campo juego/campo.mp4', { muted: true });
 
         // Slots
         this.load.image('slot', '/assets/images/cartas/Espacio vacio.png');
@@ -221,12 +221,22 @@ export default class GameScene extends Phaser.Scene {
         this.opponent.drawInitialHand();
 
         // Fondo centrado
-        this.board = this.add.image(width / 2, height / 2, 'board-bg')
-            .setOrigin(0.5)
-            .setDisplaySize(width, height);
+        this.board = this.add.video(width / 2, height / 2, 'campo-video')
+            .setOrigin(0.5);
 
         // Enviamos el tablero al fondo de la lista de renderizado.
         this.board.setDepth(-1);
+
+        // El video necesita un momento para cargar sus metadatos (dimensiones).
+        // Usamos el evento 'play' para asegurarnos de que tenemos el tamaño correcto antes de escalar.
+        this.board.on('play', () => {
+            // Escalar para cubrir todo el canvas manteniendo la proporción (cover).
+            const scaleX = width / this.board.width;
+            const scaleY = height / this.board.height;
+            const scale = Math.max(scaleX, scaleY);
+            this.board.setScale(scale);
+        });
+        this.board.play(true); // Reproducir en bucle
 
         // ---------- ZONA DE MANO DEL OPONENTE (4 espacios) ----------
         this.createSlotsRow(height * 0.18, 'opponent-slots');
