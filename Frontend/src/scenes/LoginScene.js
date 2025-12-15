@@ -10,7 +10,7 @@ export default class LoginScene extends Phaser.Scene {
 
     preload() {
         this.load.video('inicio-video', '/assets/images/inicio/inicio.mp4', { muted: true });
-        this.load.image('logo', '/assets/images/logotipo.png');
+        this.load.image('logo', '/assets/images/Logotipoletras.png');
 
         this.load.on('loaderror', (file) => console.error('Error al cargar:', file.key, file.url));
         this.load.on('complete', () => console.log('Archivos de LoginScene cargados'));
@@ -33,121 +33,120 @@ export default class LoginScene extends Phaser.Scene {
 
         const formHTML = `
             <style>
-                .overlay {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background: rgba(0,0,0,0.55);
-                    backdrop-filter: blur(3px);
-                    z-index: 9;
+                * {
+                    box-sizing: border-box;
+                    font-family: "Segoe UI", Tahoma, sans-serif;
                 }
+                body { margin: 0; }
 
-                .form-card {
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    width: 400px;
-                    padding: 30px 40px;
-                    background: rgba(15, 14, 14, 0.37);
-                    border-radius: 15px;
-                    backdrop-filter: blur(6px);
+                .login-ui {
+                    width: 300px;
+                    padding: 24px 28px;
                     text-align: center;
-                    z-index: 10;
                 }
 
-                .logo {
-                    width: 200px;
-                    margin-bottom: 15px;
+                .login-ui input {
+                    width: 100%;
+                    margin: 6px 0;
+                    padding: 6px 8px;
+                    border-radius: 8px;
+                    border: 1px solid #faebc8ff;
+                    background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0));
+                    color: #ffd77a;
+                    font-weight: 600;
+                    box-shadow: 
+                        0 0 8px rgba(0,0,0),
+                        0 0 8px rgba(0, 0, 0);
                 }
 
-                .form-card h2 {
-                    color: white;
-                    font-size: 22px;
-                    margin-bottom: 4px;
-                }
-
-                .subtitle {
-                    color: #d5d5d5;
-                    font-size: 14px;
-                    margin-bottom: 20px;
-                }
-
-                .form-card label {
+                .login-ui .login-label {
                     display: block;
                     text-align: left;
-                    color: white;
-                    margin: 6px 0 4px;
-                }
-
-                .form-card input {
-                    width: 100%;
-                    padding: 12px;
-                    margin-bottom: 10px;
-                    border-radius: 8px;
-                    background: #b3abaa;
-                    border: none;
                     font-size: 14px;
-                    outline: none;
-                    box-sizing: border-box;
+                    color: #ffd77a;
+                    font-weight: 600;
+                    text-align: center;
+                    text-shadow: 0 0 2px #000, 0 0 4px #000, 0 0 6px #000;
                 }
 
-                .btn-primary {
+                .login-ui button {
                     width: 100%;
-                    padding: 12px;
-                    margin-top: 10px;
-                    border: none;
+                    margin-top: 44px;
+                    padding: 8px;
                     border-radius: 10px;
-                    background: linear-gradient(90deg, #7a00ff, #5a37f8ff);
-                    color: white;
-                    font-size: 15px;
+                    border: 1px solid #ffd77a;
                     cursor: pointer;
+                    font-weight: 500;
+                    box-shadow: 
+                        0 0 12px rgba(0, 0, 0) inset,
+                        0 0 24px rgba(0, 0, 0) inset,
+                        0 0 12px rgba(0, 0, 0);
                 }
 
-                .btn-primary:hover {
-                    opacity: .9;
+                .btn-login {
+                    background-color: #0b6c64;
+                    color: #ffd77a;
+                    text-shadow: 0 1px 0 rgba(0,0,0,0.6);
+                    border: 1px solid rgba(255,255,255,0.06);
                 }
 
-                .login-text {
-                    color: white;
-                    margin-top: 15px;
-                    font-size: 14px;
-                }
-
-                .login-text a {
-                    color: #303df1ff;
+                .login-link {
+                    display: block;
+                    margin-top: 10px;
+                    font-size: 16px;
+                    color: #ffd77a;
                     text-decoration: none;
+                    cursor: pointer;
+                    text-shadow: 0 0 2px #000, 0 0 4px #000, 0 0 6px #000;
                 }
 
-                .login-text a:hover {
-                    text-decoration: underline;
+                /* Left-side small stacked buttons */
+                .left-buttons { position: relative; }
+                .left-buttons button {
+                    display: block;
+                    width: 180px;   
+                    margin: 8px 0;
+                    padding: 6px 8px;
+                    border-radius: 8px;
+                    background-color: #0b6c64;
+                    box-shadow:
+                        0 0 12px rgba(0, 0, 0) inset,
+                        0 0 24px rgba(0, 0, 0) inset,
+                        0 0 12px rgba(0, 0, 0);
+                    color: #ffd77a;
+                    border: 1px solid #ffd77a;
+                    cursor: pointer;
+                    text-align: center;
+                    font-weight: 500;
                 }
             </style>
-            <div class="overlay"></div>
-            <form class="form-card">
-                <img src="/assets/images/logotipo.png" alt="Elemental Battlecards" class="logo" />
-                <h2>Iniciar Sesión</h2>
-                <p class="subtitle">¡Qué bueno verte de nuevo!</p>
-                <label>Nombre de usuario</label>
-                <input type="text" name="username" placeholder="Username" required>
-                <label>Contraseña</label>
-                <input type="password" name="password" placeholder="********" required>
-                <button type="button" class="btn-primary">Entrar</button>
-                <p class="login-text">
-                    ¿No tienes una cuenta?
-                    <a href="#" id="register-link">Regístrate</a>
-                </p>
-            </form>
+
+                <div class="login-ui">
+                    <div style="margin-bottom: 10px;">
+                        <label class="login-label">Usuario</label>
+                        <input name="username" type="text">
+                    </div>
+                    <div>
+                        <label class="login-label">Contraseña</label>
+                        <input name="password" type="password">
+                    </div>
+
+                    <button type="button" class="btn-login" id="login-btn">Iniciar sesión</button>
+
+                    <a href="#" id="register-link" class="login-link">¿No tienes cuenta? <strong>Crear cuenta</strong></a>
+                </div>
         `;
+
 
         this.formElement = this.add.dom(width / 2, height / 2).createFromHTML(formHTML);
 
-        const loginButton = this.formElement.node.querySelector('.btn-primary');
+        const loginButton = this.formElement.node.querySelector('.btn-login');
+        const usernameInput = this.formElement.getChildByName('username') || this.formElement.node.querySelector('input[name="username"]');
+        const passwordInput = this.formElement.getChildByName('password') || this.formElement.node.querySelector('input[name="password"]');
+
         loginButton.addEventListener('click', async () => {
-            const username = this.formElement.getChildByName('username').value.trim();
-            const password = this.formElement.getChildByName('password').value;
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value;
 
             if (!username || !password) {
                 alert('Por favor, introduce usuario y contraseña.');
@@ -181,15 +180,46 @@ export default class LoginScene extends Phaser.Scene {
             } finally {
                 loginButton.disabled = false;
                 loginButton.style.opacity = '';
-                loginButton.textContent = 'Entrar';
+                loginButton.textContent = 'Iniciar sesión';
             }
         });
+
+        // Crear botones laterales fijos a la izquierda, abajo
+        const leftButtonsHTML = `
+            <div class="left-buttons">
+                <button id="news-btn">Noticias</button>
+                <button id="credits-btn">Créditos</button>
+                <button id="contact-btn">Contacto</button>
+            </div>
+        `;
+
+        this.leftButtonsElement = this.add.dom(120, this.scale.height - 180).createFromHTML(leftButtonsHTML);
+
+        const newsBtn = this.leftButtonsElement.node.querySelector('#news-btn');
+        const creditsBtn = this.leftButtonsElement.node.querySelector('#credits-btn');
+        const contactBtn = this.leftButtonsElement.node.querySelector('#contact-btn');
+
+        if (newsBtn) newsBtn.addEventListener('click', () => alert('Noticias - próximamente'));
+        if (creditsBtn) creditsBtn.addEventListener('click', () => alert('Créditos - próximamente'));
+        if (contactBtn) contactBtn.addEventListener('click', () => alert('Contacto - próximamente'));
+
 
         const registerLink = this.formElement.node.querySelector('#register-link');
         registerLink.addEventListener('click', (event) => {
             event.preventDefault();
             this.scene.start('RegisterScene');
         });
+
+        // Logo arriba
+        this.logoImage = this.add.image(this.scale.width / 2, this.scale.height * 0.08, 'logo').setOrigin(0.5).setDepth(1);
+        this.logoImage.setScale(Math.min(0.7, (this.scale.width / 800)));
+
+        // Copyright
+        this.copyText = this.add.text(this.scale.width / 2, this.scale.height - 18, 'Todos los derechos reservados', {
+            fontFamily: 'Segoe UI, Tahoma, sans-serif',
+            fontSize: '14px',
+            color: '#ffd77a'
+        }).setOrigin(0.5, 0.5).setDepth(1);
     }
 
     resize(gameSize) {
@@ -200,6 +230,9 @@ export default class LoginScene extends Phaser.Scene {
             const scale = Math.max(scaleX, scaleY);
             this.bg.setScale(scale);
         }
-        if (this.formElement) this.formElement.setPosition(width / 2, height / 2);
+        if (this.formElement) this.formElement.setPosition(width / 2, height / 2 - 40);
+        if (this.leftButtonsElement) this.leftButtonsElement.setPosition(90, height - 120);
+        if (this.logoImage) this.logoImage.setPosition(width / 2, height * 0.18);
+        if (this.copyText) this.copyText.setPosition(width / 2, height - 18);
     }
 }
